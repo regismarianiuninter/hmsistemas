@@ -383,7 +383,7 @@ public class PrintfManager {
                         buffer.write(new byte[]{0x0A});
                     }
                 }
-                //buffer.write(new byte[]{0x1D, 0x56, 0x00}); // Cortar papel
+                //buffer.write(new byte[]{0x1D, 0x56, 0x00}); // Testar Cortar papel usando 0x01
                 outputStream.write(buffer.toByteArray());
                 outputStream.flush();
 
