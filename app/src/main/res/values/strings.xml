@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BILHETE1</string>
+    <string name="action_settings">Settings</string>
+    <string name="toast_1">instruction</string>
+    <string name="toast_2">instruction</string>
+    <string name="toast_3">instruction</string>
+    <string name="toast_4">instruction</string>
+    <string name="toast_5">instruction</string>
+    <string name="toast_6">instruction</string>
+    <string name="DB_VIA_onCreate">CREATE TABLE Viagens (ID INTEGER PRIMARY KEY AUTOINCREMENT, Linha TEXT, Viagem TEXT, Hora TEXT, Tipvia TEXT, Tipser TEXT, Prefix TEXT); </string>
+    <string name="DB_VIA_onUpgrade">"DROP TABLE IF EXISTS Viagens </string>
+    <string name="DB_PER_onCreate">CREATE TABLE Percursos (ID INTEGER PRIMARY KEY AUTOINCREMENT, Linha TEXT, Origem TEXT, Destino TEXT, Tarifa TEXT, Seguro TEXT, Arredonda TEXT, Tipvia TEXT); </string>
+    <string name="DB_PER_onUpgrade">"DROP TABLE IF EXISTS Percursos </string>
+    <string name="DB_TRE_onCreate">CREATE TABLE Trechos (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, UF TEXT, Codmun TEXT); </string>
+    <string name="DB_TRE_onUpgrade">"DROP TABLE IF EXISTS Trechos </string>
+    <string name="DB_EMP_onCreate">CREATE TABLE EMP (ID INTEGER PRIMARY KEY AUTOINCREMENT, Cnpj TEXT, Descri TEXT, Insest TEXT, Insmun TEXT, Codcrt TEXT,
+        Endere TEXT, Numero TEXT, Bairro TEXT, Cidade TEXT, UF TEXT, Codmun TEXT, CEP TEXT, Fone TEXT, Email, CodTar TEXT, Tipamb TEXT,
+        Modelo TEXT, Serie TEXT, Ultbil TEXT, Tipemi TEXT, Tipbil TEXT, Datctg TEXT, Cnae TEXT, Empspl TEXT, Aliicm Text, Urlqrc TEXT, Crtemp TEXT, Crtsen TEXT,
+        Alitri TEXT, Maximp INTEGER, Convei TEXT, Pvenda TEXT, Endews TEXT, Rsv001 TEXT, Rsv002 TEXT, Rsv003 TEXT, Modimp TEXT, Ultdat TEXT, Cartao TEXT, Basseg TEXT,
+        Naokey TEXT, Mincan TEXT, Ultqrc TEXT, Ndstax TEXT); </string>
+    <string name="DB_EMP_onUpgrade">"DROP TABLE IF EXISTS EMP </string>
+    <string name="DB_BPE_onCreate">CREATE TABLE BPE (ID INTEGER PRIMARY KEY AUTOINCREMENT, Modser TEXT, Numbpe TEXT, Datemi TEXT, Chvbpe TEXT, Sitbpe TEXT, Agente TEXT, Tippas TEXT,
+        Vlrpas DECIMAL, Nomvia TEXT, Treori TEXT, Tredes TEXT, Qtdimp INTEGER, Transf TEXT, Rsv001 TEXT, Rsv002 TEXT, Rsv003 TEXT, Codlin TEXT, Codori TEXT, Coddes TEXT, Datsai TEXT,
+        Numcad TEXT, Vlrtar TEXT, Vlremb TEXT, Vlrseg TEXT, Vlrarr TEXT, Codvei TEXT, Pagmto TEXT, Codban TEXT, Codaut TEXT, Nidpag TEXT); </string>
+    <string name="DB_BPE_onUpgrade">"DROP TABLE IF EXISTS BPE </string>
+    <string name="DB_USR_onCreate">CREATE TABLE USR (ID INTEGER PRIMARY KEY AUTOINCREMENT, Usrnom TEXT, Usrsen TEXT, Fectur TEXT, Ultatu TEXT); </string>
+    <string name="DB_USR_onUpgrade">"DROP TABLE IF EXISTS USR </string>
+    <string name="DB_LIN_onCreate">CREATE TABLE LIN (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Prefix TEXT); </string>
+    <string name="DB_LIN_onUpgrade">"DROP TABLE IF EXISTS LIN </string>
+    <string name="DB_TMP_onCreate">CREATE TABLE TMP (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Agente TEXT, Datemi TEXT, Qqtbil INTEGER, Vlrtot DECIMAL, Vlrvale DECIMAL, Vlrembd DECIMAL, Vlrembo DECIMAL); </string>
+    <string name="DB_TMP_onUpgrade">"DROP TABLE IF EXISTS TMP </string>
+    <string name="DB_GRA_onCreate">CREATE TABLE GRA (ID INTEGER PRIMARY KEY AUTOINCREMENT, Cpfpas TEXT, Nompas TEXT, Docpas TEXT, Linha TEXT, Sentido TEXT, Tipgra TEXT, Tipdes TEXT, Mesano TEXT, Qtdpas TEXT, Qtdmes TEXT, Qtdlin TEXT); </string>
+    <string name="DB_GRA_onUpgrade">"DROP TABLE IF EXISTS GRA </string>
+    <string name="title_activity_via">ViaActivity</string>
+    <string name="title_activity_tre">TreActivity</string>
+    <string name="title_activity_edita">EmpActivity</string>
+    <string name="title_activity_config">ActivityConfig</string>
+    <string name="title_activity_login">Começar</string>
+    <string name="drawer_open">Abrir Menu Lateral</string>
+    <string name="drawer_close">Fechar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="title_activity_consulta">Consultas</string>
+    <string name="title_activity_ws">WSActivity</string>
+    <string name="mais"> &#43; </string>
+    <string name="menos"> &#45; </string>
+    <string-array name="motivos_array">
+        <item>Passageiro desistiu da viagem</item>
+        <item>Passageiro embarcou no carro errado</item>
+        <item>Trecho informado incorreto</item>
+        <item>Valores nao conferem</item>
+        <item>Passageiro nao pagou</item>
+        <item>Outros (Obrigatório Obs manual)</item>
+    </string-array>
+    <string-array name="tipdoc_array">
+        <item>1 - RG</item>
+        <item>2 - Titulo de Eleitor</item>
+        <item>3 - Passaporte</item>
+        <item>4 - CNH</item>
+        <item>5 - Outros</item>
+    </string-array>
+    <string-array name="gratuidade_array">
+        <item>00 - SEM GRATUIDADE</item>
+        <item>02 - IDOSO</item>
+        <item>03 - CRIANCA</item>
+        <item>04 - DEFICIENTE FISICO</item>
+        <item>99 - TEA - TRANSTORNO DO ESPECTRO AUTISTA</item>
+    </string-array>
+    <string-array name="desconto_array">
+        <item>Sem Desconto</item>
+        <item>1 - TOTAL 100%</item>
+        <item>2 - PARCIAL 50%</item>
+    </string-array>
+    <string-array name="impressora_array">
+        <item>00 - DEFINIR IMPRESSORA</item>
+        <item>01 - SUNMI</item>
+        <item>02 - CIELO LIO</item>
+        <item>03 - ARNY BLUETOOTH</item>
+        <item>04 - ARNY AIDL</item>
+        <item>05 - DTS-2500</item>
+    </string-array>
+    <string name="title_activity_parametros">ParametrosActivity</string>
+    <string name="title_activity_encerra">EncerraActivity</string>
+    <string name="title_activity_cancela_pagamento">CancelaPagamentoActivity</string>
+    <string name="title_activity_cielo">CieloActivity</string>
+    <string name="TEST">Test Receipt</string>
+    <string name="godown_keeper">Keeper: John Doe</string>
+    <string name="send_printer">Printer: AR-2500</string>
+    <string name="new_and_select_label">Criar ou selecionar etiqueta</string>
+    <string name="no_connect_blue_tooth">Bluetooth não conectado</string>
+    <string name="new_label">Nova etiqueta</string>
+    <string name="print_label">Imprimir etiqueta</string>
+    <string name="fast_label">Impressão rápida</string>
+    <string name="label_mode">Modelo de etiqueta</string>
+    <string name="label">Etiqueta</string>
+    <string name="insert">Inserir</string>
+    <string name="attribute">Atributo</string>
+    <string name="content">Conteúdo</string>
+    <string name="back">Voltar</string>
+    <string name="printf_blue_list">Lista de impressoras</string>
+    <string name="template_list">Lista de modelos</string>
+    <string name="printf_blue_list_search">Buscar</string>
+    <string name="printf_blue_list_stop">Parar</string>
+    <string name="main_title">Imprimir</string>
+    <string name="label_attribute">Atributos da etiqueta</string>
+    <string name="data_content">Conteúdo dos dados</string>
+    <string name="label_name">Nome da etiqueta</string>
+    <string name="label_w">Largura da etiqueta</string>
+    <string name="label_h">Altura da etiqueta</string>
+    <string name="label_interval">Intervalo da etiqueta</string>
+    <string name="label_printf_direction">Direção de impressão</string>
+    <string name="data_type">Tipo de dados</string>
+    <string name="label_paper_interval">Intervalo do papel</string>
+    <string name="label_paper_consecutively">Papel contínuo</string>
+    <string name="label_paper_location_hole">Furo de posicionamento</string>
+    <string name="label_paper_clearance_paper">Papel com intervalo</string>
+    <string name="label_paper_black">Marca preta</string>
+    <string name="interval_length">Comprimento do intervalo</string>
+    <string name="picture">Imagem</string>
+    <string name="background_picture">Imagem de fundo</string>
+    <string name="picture_name">Nome da imagem</string>
+    <string name="no_picture">Nenhuma imagem de fundo vinculada</string>
+    <string name="select_picture">Selecionar imagem</string>
+    <string name="clear_picture">Limpar fundo</string>
+    <string name="printf_migration">Margens laterais</string>
+    <string name="left_distance">Margem esquerda</string>
+    <string name="right_distance">Margem direita</string>
+    <string name="no">Nenhum</string>
+    <string name="manual_input">Entrada manual</string>
+    <string name="gradient_of_data">Dados incrementais</string>
+    <string name="current_content">Conteúdo atual</string>
+    <string name="pass_the_variable">Variável incremental</string>
+    <string name="word_space">Espaçamento entre caracteres</string>
+    <string name="gradient_of_the_number">Quantidade incremental</string>
+    <string name="horizontal_center">Centralizar horizontalmente</string>
+    <string name="vertical_center">Centralizar verticalmente</string>
+    <string name="rotation_angle">Ângulo de rotação</string>
+    <string name="qr_code">Código QR</string>
+    <string name="qc_code">Código de barras</string>
+    <string name="typeface">Fonte</string>
+    <string name="error_correction_level">Nível de correção de erro</string>
+    <string name="text_position">Posição do texto</string>
+    <string name="no_text">Sem texto</string>
+    <string name="low">Baixo</string>
+    <string name="medium">Médio</string>
+    <string name="height">Alto</string>
+    <string name="strong">Forte</string>
+    <string name="cancelp">Cancelar</string>
+    <string name="determine">Confirmar</string>
+    <string name="please_improve_the_parameters">Por favor, complete os parâmetros!</string>
+    <string name="set_label_content">Faixa: 1 - 1000, unidade: milímetros</string>
+    <string name="company_mm">Unidade: milímetros</string>
+    <string name="abnormal_data">Dados anormais</string>
+    <string name="please_enter_content">Por favor, insira o conteúdo</string>
+    <string name="current_single">Modo de seleção única</string>
+    <string name="current_more">Modo de seleção múltipla</string>
+    <string name="single">Seleção única</string>
+    <string name="more">Seleção múltipla</string>
+    <string name="position_size">Tamanho e posição</string>
+    <string name="position_left">Posição - Esquerda</string>
+    <string name="position_top">Posição - Superior</string>
+    <string name="position_w">Posição - Largura</string>
+    <string name="position_h">Posição - Altura</string>
+    <string name="horizontal_position">Posição horizontal</string>
+    <string name="vertical_position">Posição vertical</string>
+    <string name="barcode_above">Acima do código de barras</string>
+    <string name="barcode_below">Abaixo do código de barras</string>
+    <string name="typeface_name">Nome da fonte</string>
+    <string name="bar_code">Código de barras</string>
+    <string name="typeface_size">Tamanho da fonte</string>
+    <string name="align_text">Alinhamento do texto</string>
+    <string name="center">Centralizado</string>
+    <string name="left_center">Alinhado à esquerda</string>
+    <string name="right_center">Alinhado à direita</string>
+    <string name="stretching">Esticamento</string>
+    <string name="size">Tamanho</string>
+    <string name="font_too_small">Fonte muito pequena</string>
+    <string name="connection_success">Conexão bem-sucedida</string>
+    <string name="connection_fail">Falha na conexão</string>
+    <string name="connection_close">Conexão fechada</string>
+    <string name="text">Texto</string>
+    <string name="one_double">1,0x</string>
+    <string name="one_tow_double">1,2x</string>
+    <string name="one_five_double">1,5x</string>
+    <string name="tow_double">2,0x</string>
+    <string name="custom">Personalizado</string>
+    <string name="row_spacing">Espaçamento entre linhas</string>
+    <string name="save_mistake">Erro ao salvar</string>
+    <string name="save_success">Salvo com sucesso</string>
+    <string name="do_you_need_to_keep_it">Deseja salvar?</string>
+    <string name="prompt">Aviso</string>
+    <string name="again_reflection">Pensar novamente</string>
+    <string name="save">Salvar</string>
+    <string name="no_save">Não salvar</string>
+    <string name="data_error">Erro nos dados</string>
+    <string name="please_input_name">Por favor, insira o nome</string>
+    <string name="name">Nome</string>
+    <string name="link">Linha</string>
+    <string name="newly_build">Criar novo</string>
+    <string name="rectangle">Retângulo</string>
+    <string name="table">Tabela</string>
+    <string name="data">Data</string>
+    <string name="open">Abrir</string>
+    <string name="as_save">Salvar como</string>
+    <string name="copy">Copiar</string>
+    <string name="lock">Bloquear</string>
+    <string name="printf">Imprimir</string>
+    <string name="upload">Enviar</string>
+    <string name="line">Linha</string>
+    <string name="line_w">Largura da linha</string>
+    <string name="line_h">Altura da linha</string>
+    <string name="please_connect_bluetooth">Por favor, conecte o Bluetooth primeiro!</string>
+    <string name="print_number">Quantidade de impressões</string>
+    <string name="please_input_print_number">Por favor, insira a quantidade de impressões</string>
+    <string name="print_now">Imprimindo... Aguarde</string>
+    <string name="connect_now">Conectando...</string>
+    <string name="bluetooth_disconnect">Conexão Bluetooth interrompida</string>
+    <string name="bluetooth_close">Bluetooth desativado</string>
+    <string name="system_template">Modelos do sistema</string>
+    <string name="own_save_template">Modelos salvos</string>
+    <string name="line_position">Direção da linha</string>
+    <string name="vertical">Vertical</string>
+    <string name="horizontal">Horizontal</string>
+    <string name="start_search">Buscando...</string>
+    <string name="stop_search">Busca concluída</string>
+    <string name="permissions_are_rejected">É necessário ativar permissões para usar as funções "Salvar" e "Salvar como"</string>
+    <string name="to_set_up">Ir para configurações</string>
+    <string name="permissions_are_rejected_bluetooth">É necessário ativar permissões para usar a função de escaneamento Bluetooth</string>
+    <string name="delete_file_prompt">Após excluir o modelo, não será possível recuperá-lo!</string>
+    <string name="already_paired">Já pareado</string>
+    <string name="unpaired">Não pareado</string>
+    <string name="nearby_bluetooth">Dispositivos Bluetooth próximos</string>
+    <string name="current_printer">Impressora atual</string>
+    <string name="modify">Modificar</string>
+    <string name="address">Endereço</string>
+    <string name="name_colon">Nome:</string>
+    <string name="address_colon">Endereço:</string>
+    <string name="bluetooth_is_being_connected">Bluetooth em conexão, aguarde...</string>
+    <string name="bluetooth_name">Nome do Bluetooth</string>
+    <string name="please_input_bluetooth_name">Por favor, insira o nome do Bluetooth</string>
+    <string name="setting">Configurações</string>
+    <string name="multilingual">Multilíngue</string>
+    <string name="current_version">Versão atual</string>
+    <string name="please_select_language">Por favor, selecione o idioma desejado</string>
+    <string name="please_select_folder">Por favor, selecione a pasta para salvar</string>
+    <string name="chinese">Chinês</string>
+    <string name="english">Inglês</string>
+    <string name="traditional_chinese">Chinês tradicional</string>
+    <string name="japanese">Japonês</string>
+    <string name="korean">Coreano</string>
+    <string name="spanish">Espanhol</string>
+    <string name="french">Francês</string>
+    <string name="coming_soon">Em breve</string>
+    <string name="printer_professional_manufacturer">Fabricante profissional de impressoras</string>
+    <string name="chang_languge_pro">Alterar o idioma reiniciará o aplicativo!</string>
+    <string name="default_">Padrão</string>
+    <string name="edit_the_picture">Deseja editar a imagem?</string>
+    <string name="to_cut">Editar</string>
+    <string name="do_not_cut">Não editar</string>
+    <string name="save_now">Salvando... Aguarde</string>
+    <string name="load_now">Carregando... Aguarde</string>
+    <string name="delete">Excluir</string>
+    <string name="threshold">Limiar</string>
+    <string name="two_value_pro">Padrão: 128, faixa: 0 - 255. Não ajuste este parâmetro se não souber como funciona!</string>
+    <string name="printf_concentration">Limiar</string>
+    <string name="un_lock">Desbloquear</string>
+    <string name="add_bitmap_compress">Comprimir ao adicionar imagem</string>
+    <string name="serialize">Serialização</string>
+    <string name="serialize_type">Tipo de serialização</string>
+    <string name="change">Incremento</string>
+    <string name="file">Arquivo</string>
+    <string name="select_file">Selecionar arquivo</string>
+    <string name="current_file_number">Quantidade de itens atuais:</string>
+    <string name="please_input">Por favor, insira</string>
+    <string name="content_no_serialize">O conteúdo não pode ser incrementado, insira apenas números</string>
+    <string name="please_select_printf_type">Por favor, selecione o tipo de impressão</string>
+    <string name="ordinary_printf">Impressão normal</string>
+    <string name="serialize_printf">Impressão serializada</string>
+    <string name="select_file_error">Erro nos dados do arquivo selecionado</string>
+    <string name="print_now_NO">Imprimindo a</string>
+    <string name="zhang">ª folha</string>
+    <string name="printf_finish">Impressão concluída</string>
+    <string name="printf_error_check">Erro de impressão, verifique se a impressora está desconectada</string>
+    <string name="cancel_new">Cancelando</string>
+    <string name="cancel_printf">Cancelar impressão</string>
+    <string name="paper_setting">Configuração de papel</string>
+    <string name="total_paper">Total de folhas:</string>
+    <string name="surplus_paper">Folhas restantes:</string>
+    <string name="surplus_paper_no">Folhas restantes</string>
+    <string name="already_printf_paper">Folhas impressas:</string>
+    <string name="please_total_paper">Por favor, insira a quantidade de folhas</string>
+    <string name="setting_paper_pro">Aviso: Clicar em Confirmar recalculará com base nas suas configurações</string>
+    <string name="label_no_content">Etiqueta sem conteúdo</string>
+    <string name="time_format">AAAA-MM-DD HH:mm</string>
+    <string name="printf_type">Tipo de impressão:</string>
+    <string name="print_number_colon">Quantidade de impressões:</string>
+    <string name="content_to_long">Conteúdo muito longo</string>
+    <string name="chang_bluetooth_name_success">Nome do Bluetooth alterado com sucesso, reinicie a impressora para aplicar</string>
+    <string name="chang_bluetooth_name_fail">Falha ao alterar o nome do Bluetooth, tente reiniciar a impressora</string>
+    <string name="chang_bluetooth_name_now">Alterando o nome do Bluetooth... Aguarde</string>
+    <string name="font_size">Tamanho da fonte</string>
+    <string name="font_bold">Negrito</string>
+    <string name="bold">Negrito</string>
+    <string name="no_bold">Sem negrito</string>
+    <string name="test_bold_font">Testar fonte em negrito</string>
+    <string name="current_bluetooth">Bluetooth atual:</string>
+    <string name="no_connect_bluetooth">Bluetooth não conectado</string>
+    <string name="company_name">Nome da empresa</string>
+    <string name="operator">Operador:</string>
+    <string name="time">Hora</string>
+    <string name="type">Tipo</string>
+    <string name="number">Quantidade</string>
+    <string name="price">Preço</string>
+    <string name="remarks">Observações:</string>
+    <string name="test_80_receipt">Testar recibo de 80mm</string>
+    <string name="test_58_receipt">Testar recibo de 58mm</string>
+    <string name="label_name_title">Nome da Etiqueta</string>
+    <string name="label_name_cannot_be_empty">O nome da etiqueta não pode estar vazio</string>
+    <string name="label_name_input">Nome da Etiqueta:</string>
+
+</resources>
+

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFBB33"
+        android:contentDescription="@string/app_name"
+        android:scaleType="center"
+        android:src="@drawable/passageiro" />
+
+    <EditText
+        android:id="@+id/edtCPF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="sans-serif"
+        android:hint="CPF (Opcional)"
+        android:inputType="number" />
+
+    <EditText
+        android:id="@+id/edtnome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Nome do Passageiro"
+        android:textAllCaps="true"
+        android:inputType="textCapCharacters"/>
+
+    <Spinner
+        android:id="@+id/spnTipdoc"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Tipo de Documento" />
+
+    <EditText
+        android:id="@+id/edtrg"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="5dp"
+        android:fontFamily="sans-serif"
+        android:hint="Documento N° (Obrigatório)"
+        android:inputType="number" />
+
+    <Spinner
+        android:id="@+id/spnTipgra"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Tipo de Gratuidade" />
+
+    <Spinner
+        android:id="@+id/spnTipdes"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginRight="4dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Tipo de Desconto" />
+
+
+</LinearLayout>

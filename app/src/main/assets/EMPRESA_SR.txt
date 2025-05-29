@@ -1,0 +1,1 @@
+﻿27496942000169;VIACAO SAO ROQUE LTDA;080445985;20724;3;RUA FIORAVANTE ROSI;670;SAO BRAZ;COLATINA;ES;3201506;29703810;2721012901;viacaosaoroque@viacaosaoroque.com.br;320443;2;63;2;0;1;0;N;4921301;N;12;https://dfe-portal.sefazvirtual.rs.gov.br/bpe/qrcode;SaoRoque.pfx;123456;16.6;1;N;E;http://hmvix.dyndns.info:2222/sohmab_SR/tempService.wso;xx;xx;xx;

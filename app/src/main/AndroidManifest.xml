@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.usuario.bilhete1">
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_OWNER_DATA" />
+    <uses-permission android:name="android.permission.READ_OWNER_DATA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+    <queries>
+        <intent>
+            <action android:name="someService.AIDL" />
+        </intent>
+    </queries>
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/bilhete1_ico"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/bilhete1_ico_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:replace="android:allowBackup,icon,theme,label">
+        <activity android:name="com.example.usuario.bilhete1.Utils.PrintfBlueListActivity"></activity>
+        <receiver
+            android:name="com.x4fare.mobipix.onboard.sdk.receiver.MobiPixOnboardNetworkChangeReceiver"
+            android:exported="true"
+            android:label="MobiPixOnboardNetworkChangeReceiver">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Configuracoes"
+            android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".TreActivity"
+            android:label="Selecione uma Opção" />
+        <activity
+            android:name=".ViaActivity"
+            android:label="Vender Bilhete"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".EditaActivity"
+            android:label="@string/title_activity_edita"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".ActivityConfig"
+            android:label="@string/title_activity_config"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".LoginActivity"
+            android:label="@string/title_activity_login"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".ConsultaActivity"
+            android:label="@string/title_activity_consulta"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".WSActivity"
+            android:label="@string/title_activity_ws"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".ParametrosActivity"
+            android:label="@string/title_activity_parametros"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".EncerraActivity"
+            android:label="@string/title_activity_encerra"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".TesteActivity"
+            android:label="Teste de Impressão" />
+
+        <meta-data
+            android:name="mobipix.sdk.environment"
+            android:value="QA" />
+        <meta-data
+            android:name="mobipix.sdk.validation.question.offline.weight"
+            android:value="NEVER" />
+        <meta-data
+            android:name="mobipix.sdk.validation.question.online.weight"
+            android:value="NEVER" />
+
+    </application>
+
+</manifest>

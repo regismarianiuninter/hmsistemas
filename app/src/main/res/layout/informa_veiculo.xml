@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFBB33"
+        android:contentDescription="@string/app_name"
+        android:scaleType="center"
+        android:src="@drawable/mensagem" />
+
+
+    <EditText
+        android:id="@+id/edtMensagem"
+        android:layout_width="342dp"
+        android:layout_height="108dp"
+        android:ems="10"
+        android:inputType="textMultiLine" />
+
+    <Spinner
+        android:id="@+id/spnPlaca"
+        android:layout_width="168dp"
+        android:layout_height="50dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginBottom="20dp"
+        android:layout_weight="1"
+        android:ems="10"
+        android:inputType="textPersonName"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+
+
+
+</LinearLayout>

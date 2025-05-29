@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Botão Voltar -->
+    <TextView
+        android:id="@+id/tv_blue_list_back"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Voltar" />
+
+    <!-- Botão para buscar/parar busca de dispositivos -->
+    <TextView
+        android:id="@+id/tv_blue_list_operation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Buscar" />
+
+    <!-- Nome do dispositivo Bluetooth -->
+    <TextView
+        android:id="@+id/tv_blue_list_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Nome: Nenhum" />
+
+    <!-- Endereço do dispositivo Bluetooth -->
+    <TextView
+        android:id="@+id/tv_blue_list_address"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Endereço: Nenhum" />
+
+    <!-- Botão para modificar o nome do dispositivo -->
+    <TextView
+        android:id="@+id/tv_blue_list_modify"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Modificar Nome" />
+
+    <!-- Seção de dispositivos pareados -->
+    <LinearLayout
+        android:id="@+id/ll_blue_list_already_paired"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dispositivos Pareados" />
+        <ImageView
+            android:id="@+id/iv_blue_list_already_paired"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/arrow_down_float" />
+    </LinearLayout>
+
+    <!-- Lista de dispositivos pareados -->
+    <ListView
+        android:id="@+id/lv_already_blue_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <!-- Seção de dispositivos não pareados -->
+    <LinearLayout
+        android:id="@+id/ll_blue_list_unpaired"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dispositivos Não Pareados" />
+        <ImageView
+            android:id="@+id/iv_blue_list_unpaired"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/arrow_down_float" />
+    </LinearLayout>
+
+    <!-- Lista de dispositivos não pareados -->
+    <ListView
+        android:id="@+id/lv_blue_list"
+        android:layout_width="match_parent"
+        android:layout_height="458dp" />
+
+    <Button
+        android:id="@+id/btnImprime"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Teste de Impressão" />
+</LinearLayout>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+
+                <EditText
+                    android:id="@+id/edtLinha"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:inputType="textPersonName" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnPrint"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Imprimir Teste" />
+
+                        <Button
+                            android:id="@+id/btnVender"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Nova Viagem" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnPercursos"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Permissão Fechar Turno" />
+
+                <Button
+                    android:id="@+id/btnEmpresa"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Configurar Empresa" />
+
+                <Button
+                    android:id="@+id/btnCadastros"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Consulta e Altera Cadastros" />
+
+                <Button
+                    android:id="@+id/btnClear"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Limpar Base DB_BPE (ATENÇÃO)" />
+
+
+                <Button
+                    android:id="@+id/obtnCancelPGTO"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="CANCELA PAGAMENTO" />
+
+                <Button
+                    android:id="@+id/btnAssinar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Teste Assinatura" />
+
+                <Button
+                    android:id="@+id/btnLerQR"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Ler QR-Code" />
+
+                <Button
+                    android:id="@+id/btnGeratoken"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Gerar Token" />
+
+                <Button
+                    android:id="@+id/btnConsultaUsrGratuidade"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Consulta Usuário"/>
+
+        </LinearLayout>
+
+
+
+
+</LinearLayout>
+
+
+
+
