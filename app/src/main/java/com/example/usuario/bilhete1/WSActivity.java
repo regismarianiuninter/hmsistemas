@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
@@ -71,6 +72,7 @@ public class WSActivity extends AppCompatActivity {
     private static String DOCUSR = "";
 
     private static String TIPGRA = "";
+    private static String Vlrtotal = "";
 
     private ExecutorService serverw =  Executors.newSingleThreadExecutor();
 
@@ -113,6 +115,8 @@ public class WSActivity extends AppCompatActivity {
         String snomeusr = bundle.getString("NOMEUSR");
         String sdocusr = bundle.getString("DOCUSR");
         String stipgra = bundle.getString("TIPGRA");
+        String svlrtotal = bundle.getString("Vlrtotal");
+        String sagente = bundle.getString("AGENTE");
 
         Nome_Arquivo = sarquivo;
         Nome_user = user;
@@ -133,7 +137,7 @@ public class WSActivity extends AppCompatActivity {
         SerieWS = sserie;
         DatemiWS = sdatemi;
         VeiculoWS = sveiculo;
-        AgenteWS = user;
+        AgenteWS = sagente;
         PagWS = spag;
         TipviaWS = stipvia;
         WScomando = scomando;
@@ -147,16 +151,17 @@ public class WSActivity extends AppCompatActivity {
         NOMEUSR = snomeusr;
         DOCUSR = sdocusr;
         TIPGRA = stipgra;
+        Vlrtotal = svlrtotal;
 
 
 
         if (!scomando.equals("")) {
             if (!scomando.equals("CONEXAO")) {
                 if (!scomando.equals("TOKEN")) {
-                    int delay = 12000;   // delay de 5 seg.
-                    if (!scomando.equals("KEY") && !scomando.equals("TARIFAS")) {
+                    int delay = 15000;   // delay de 5 seg.
+                    if (!scomando.equals("KEY") && !scomando.equals("TARIFAS") && !scomando.equals("VERIFICA_CONEXAO"))  {
                         if (sCancel.equals("S")) {
-                            delay = 14000;
+                            delay = 15000;
                         }
                     } else {
                         delay = 25000;
@@ -314,10 +319,15 @@ public class WSActivity extends AppCompatActivity {
                         sret = ConsultaBPeWS.Consulta_Xml(sendews, stexto, schavebpe, LinviaWS, DatviaWS, NumcadWS, TreoriWS, TredesWS,
                                 VlrtarWS, VlrembWS, VlrsegWS, VlrarreWS, SerieWS, DatemiWS, VeiculoWS, AgenteWS, TipviaWS, PagWS, WScomando,
                                 "", CancelarWS, MotivoWS, getApplicationContext());
+                        if (sret == null) sret = "";
+                        sret = sret.trim();
+                        if (sret.length() <= 1) {
+                            sret = sret.replaceAll("\\r?\\n", "");
+                        }
                         Retorno_WS = sret;
                         System.out.println("Transmite 05 Resultado ConsultaBPeWS: " + sret);
                         System.out.println("Transmite 05 Activity_Dados: " + Activity_Dados);
-                        if (!sret.equals("")) {
+                        if (!sret.equals("") && !sret.equals(" ")) {
                             timer.cancel();
                             sret = sret.replace("m:", "");
                             try {
@@ -1017,16 +1027,89 @@ public class WSActivity extends AppCompatActivity {
                         finish();
                     }
                 } else if (scomando.equals("TOKEN")) {
+                    DB_EMP dbemp = new DB_EMP(WSActivity.this);
                     File dircert = new File (getExternalFilesDir("Download").getAbsolutePath());
-                    String scertificado = dircert+"/certificadotoken.pfx";
-                    //sret = ConsomeAPI_BAN.getAccessToken("08850bec-a8dc-492f-b7eb-fcf079136aac", "0276f36d-9663-4b28-993a-f8fb945e5c9a", "https://api-pix.banestes.b.br", "/oauth/v1/access-token", scertificado, "@HMinfo@0824");
-                    sret = ConsomeAPI_BAN.geraToken("https://api-pix.banestes.b.br", "/oauth/v1/access-token", "08850bec-a8dc-492f-b7eb-fcf079136aac", "0276f36d-9663-4b28-993a-f8fb945e5c9a", scertificado);
+                    String scertificado = dircert+"/"+dbemp.Busca_Dados_Emp(1, "Bancrt");//Nome do certificado
+                    String pfxPassword = dbemp.Busca_Dados_Emp(1, "Bansen");//Senha do certificado
+                    String clientId = dbemp.Busca_Dados_Emp(1, "Cliidb");//Client ID
+                    String clientSecret = dbemp.Busca_Dados_Emp(1, "Clisec");//Client secret
+                    String baseUrl = dbemp.Busca_Dados_Emp(1, "Banwse");//URL Padrao
+                    String accessToken = "";
+                    String qrCodeText = "";
+                    String svalorvenda = Vlrtotal;
+                    String sserie = dbemp.Busca_Dados_Emp(1, "Serie");//Serie do bilhete
+                    String sultimo = dbemp.Busca_Dados_Emp(1, "Ultbil");//Ultimo bilhete emitido
+                    String snumpdv = dbemp.Busca_Dados_Emp(1, "Idepdv");//ID do dispositivo
+                    int iultimo = Integer.parseInt(sultimo);
+                    int iproximo = (iultimo+1);
+                    String sbilhete = Integer.toString(iproximo);
+                    String ntxtunic = snumpdv+sserie+sbilhete;
+
+
+                    try {
+                        //instaciar a classe
+                        ConsomeAPI_BAN client = new ConsomeAPI_BAN(baseUrl,scertificado,pfxPassword);
+                        // Obter o token
+                        accessToken =  client.getAccessToken( clientId, clientSecret );
+
+                        // Criar a cobrança Pix e obter qrCodeText
+                        qrCodeText = client.getQrcodePix(
+                                accessToken, dbemp.Busca_Dados_Emp(1, "Banchv"),dbemp.Busca_Dados_Emp(1, "Descri"), svalorvenda,ntxtunic,sbilhete
+                        );
+
+                        if(!qrCodeText.equals("")){
+                            Intent qrCodeIntent = new Intent();
+
+                            qrCodeIntent.putExtra("msg", qrCodeText);
+                            qrCodeIntent.putExtra("Activity_Dados", Activity_Dados);
+                            setResult(RESULT_OK, qrCodeIntent);
+
+                            // importante para voltar a primeira Activity pai
+                            timer.cancel();
+                            finish();
+
+                        }
+
+
+
+                        // Capturar a data/hora atual
+                        Date qrCodeDate = new Date();
+
+                        for (int attempt = 1; attempt <= 30; attempt++) {
+                            try {
+                                // Consultar o status do Pix
+                                String status = client.consultarPix(accessToken, ntxtunic,qrCodeDate);
+                                if ("CONCLUIDA".equalsIgnoreCase(status)) {
+                                    System.out.println("Pagamento confirmado! Status: " + status);
+                                } else {
+                                    System.out.println("Aguardando pagamento... Status: " + status + " (Tentativa " + attempt + " de " + 30 + ")");
+                                }
+
+                                if ("CONCLUIDA".equalsIgnoreCase(status)) {
+                                    break; // Sai do loop se o pagamento for confirmado
+                                }
+
+                                // Aguardar antes da próxima tentativa
+                                Thread.sleep(1000);
+
+                            } catch (Exception e) {
+                                System.out.println("Erro na consulta (Tentativa " + attempt + "): " + e.getMessage());
+                                e.printStackTrace();
+                                break; // Sai do loop em caso de erro
+                            }
+                        }
+
+
+
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
                     Intent i = new Intent();
 
-                    i.putExtra("msg", "sMsgretws Retorno Token: " + sret);
+                    i.putExtra("msg", "sMsgretws Retorno qr Code: " + qrCodeText);
                     i.putExtra("Activity_Dados", Activity_Dados);
                     i.putExtra("XML", Nome_Arquivo); // Retorna o XML original
-                    System.out.println("sMsgretws Retorno Token: "+sret);
+                    System.out.println("sMsgretws Retorno Token: "+ sret);
                     setResult(RESULT_OK, i);
 
                     // importante para voltar a primeira Activity pai

@@ -5,4 +5,53 @@
     <color name="colorAccent">#FF4081</color>
     <color name="tran_light_grey">#88EEEEE0</color>
     <color name="title">#0083C7</color>
+
+        <!-- Paleta clara (padrão). Ajuste as cores conforme sua identidade visual. -->
+        <color name="md_theme_primary">#006D3C</color>
+        <color name="md_theme_onPrimary">#FFFFFF</color>
+        <color name="md_theme_primaryContainer">#86F9B2</color>
+        <color name="md_theme_onPrimaryContainer">#002110</color>
+
+
+        <color name="md_theme_secondary">#4F6356</color>
+        <color name="md_theme_onSecondary">#FFFFFF</color>
+        <color name="md_theme_secondaryContainer">#D2E8D8</color>
+        <color name="md_theme_onSecondaryContainer">#0D1F15</color>
+
+
+        <color name="md_theme_tertiary">#3B6470</color>
+        <color name="md_theme_onTertiary">#FFFFFF</color>
+        <color name="md_theme_tertiaryContainer">#BFE9F7</color>
+        <color name="md_theme_onTertiaryContainer">#001F27</color>
+
+
+        <color name="md_theme_error">#BA1A1A</color>
+        <color name="md_theme_onError">#FFFFFF</color>
+        <color name="md_theme_errorContainer">#FFDAD6</color>
+        <color name="md_theme_onErrorContainer">#410002</color>
+
+
+        <color name="md_theme_background">#FCFDF7</color>
+        <color name="md_theme_onBackground">#1A1C19</color>
+        <color name="md_theme_surface">#F9FAF4</color>
+        <color name="md_theme_onSurface">#1A1C19</color>
+        <color name="md_theme_surfaceVariant">#DEE5DA</color>
+        <color name="md_theme_onSurfaceVariant">#424940</color>
+        <color name="md_theme_outline">#73796F</color>
+        <color name="md_theme_outlineVariant">#C2C9BE</color>
+
+
+        <color name="md_theme_inverseOnSurface">#F1F1EC</color>
+        <color name="md_theme_inverseSurface">#2F312D</color>
+        <color name="md_theme_inversePrimary">#67DC98</color>
+
+
+        <!-- Suporte a barra de status/navegação -->
+        <color name="md_theme_surfaceTint">@color/md_theme_primary</color>
+
+
+
+
 </resources>
+
+

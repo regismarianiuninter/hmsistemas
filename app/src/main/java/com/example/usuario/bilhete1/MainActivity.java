@@ -37,6 +37,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
@@ -239,8 +240,16 @@ public class MainActivity extends AppCompatActivity {
                             if (result.getResultCode() == RESULT_OK) {
 
                                 Nome_user = sUser;
+                                DB_USR dbusr = new DB_USR(MainActivity.this);
+                                String stipPvd = "";
+                                if (!sUser.equals("")) {
+                                    stipPvd = dbusr.Busca_Dados_Usr(Nome_user, "Tippvd");
+                                }
+
                                 if (sUser.equals("HMINFO")) {
                                     innitView();
+                                } else if (stipPvd.equals("S")) {
+                                    Abre_Venda_Qrcode_Sanitario();
                                 } else { //se nao for usuario HMINFO mostrar apenas a tela de venda
                                     Abre_Venda();
                                 }
@@ -367,7 +376,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Usuario_Inicial();
         context = this;
-        initData();
+       // initData();
 
         if (Nome_user.equals("") || !Nome_user.equals("HMINFO")){ //se ainda nao fez login
             Nome_user = "";
@@ -393,6 +402,7 @@ public class MainActivity extends AppCompatActivity {
         Button btnlerqr = findViewById(R.id.btnLerQR);
         Button btngerartoken = findViewById(R.id.btnGeratoken);
         Button btnConsultaUsrGratuidade = findViewById(R.id.btnConsultaUsrGratuidade);
+        Button btnQrCodeSanitarios = findViewById(R.id.btnQrCodeSanitarios);
         //Abrir cadastro de emrpedsas
         btnEmpresa.setOnClickListener(new View.OnClickListener(){
             public void onClick(View v) {
@@ -404,27 +414,18 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 EditText editText = findViewById(R.id.edtLinha);
                 String slinha = editText.getText().toString();
-                if (printfManager == null) {
+                Intent myIntent = new Intent(MainActivity.this, PrintfBlueListActivity.class);
+                Bundle bundle = new Bundle();
+                bundle.putString("USUARIO", Nome_user);
+                myIntent.putExtras(bundle);
+                resultadoImpressora.launch(myIntent);
+                /*if (printfManager == null) {
                     Log.e(TAG, "PrintfManager é null");
                     Util.ToastText(context, "Erro: Impressora não inicializada");
                     return;
                 }
                 //PrintfBlueListActivity.startActivity(MainActivity.this);
                 if (printfManager.isConnect()) {
-                /*String testQR = "https://dfe-portal.svrs.rs.gov.br/bpe/qrcode?chBPe=32250127143718000193630170000000081000003632&tpAmb=2";
-                try {
-                    printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(testQR, 100));
-                    printfManager.printf_Texto("F", "C", "N", "N", "", 4);
-                    printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(testQR, 150));
-                    printfManager.printf_Texto("F", "C", "N", "N", "", 4);
-                    printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(testQR, 180));
-                    printfManager.printf_Texto("F", "C", "N", "N", "", 4);
-                    printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(testQR, 200));
-                    printfManager.printf_Texto("F", "C", "N", "N", "", 4);
-                } catch (PrinterConverter.PrinterException e) {
-                    Log.e(TAG, "Erro ao imprimir QR Code de teste", e);
-                    Toast.makeText(MainActivity.this, "Erro ao imprimir QR Code: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }*/
                     List<PrintfManager.PrintCommand> commands = new ArrayList<>();
                     commands.add(new PrintfManager.PrintCommand("C", "S", "N", "TESTE", 1));
                     commands.add(new PrintfManager.PrintCommand("C", "N", "N", "TESTE", 1));
@@ -435,7 +436,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Log.d(TAG, "Impressora não conectada, abrindo PrintfBlueListActivity");
                     PrintfBlueListActivity.startActivity(MainActivity.this);
-                }
+                }*/
 
             }
         });
@@ -494,6 +495,13 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        //Abrir tela de venda de qr code para os sanitarios
+        btnQrCodeSanitarios.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View v) {
+                Abre_Venda_Qrcode_Sanitario();
+            }
+        });
+
 
 
         // Add callback listener
@@ -515,6 +523,18 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+
+
+    ActivityResultLauncher<Intent> resultadoImpressora = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), new ActivityResultCallback<ActivityResult>() {
+        @Override
+        public void onActivityResult(ActivityResult result) {
+            if (result != null) {
+                EditText edtimp = findViewById(R.id.edtImpressora);
+                EditText edtid = findViewById(R.id.edtIDimp);
+                DB_EMP dbemp = new DB_EMP(MainActivity.this);
+            }
+        }
+    });
 
     private void initData() {
         try {
@@ -614,8 +634,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (cursor.getCount() == 0){
-            dbu.InserirUsr("HMINFO", "1hm26990", "S", "");
-            dbu.InserirUsr("CIELO", "123456", "S", "");
+            dbu.InserirUsr("HMINFO", "1hm26990", "S", "", "");
+            dbu.InserirUsr("CIELO", "123456", "S", "", "");
 
         }
     }
@@ -866,6 +886,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void Ler_QRcode(){
+        Activity_Dados = 104;
         Intent intentz = new Intent("com.google.zxing.client.android.SCAN");
         //QR_CODE_MODE: QRCODE , ONE_D_MODE: Codigo de barras
         intentz.putExtra("SCAN_MODE", "QR_CODE_MODE");
@@ -895,8 +916,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void ConsultaGratuidadeUsr(){
+        File fXmlFile = new File(getExternalFilesDir("Download").getAbsolutePath() + "/32250927143718000193630170000000311000005314-procBPe.xml");
+        //val input: InputStream = /* seu XML (arquivo, rede, assets) */
+         //       val data = BPeXmlParser.parse(input)   // mapeia ide/emitente/viagem/valores/pagamento/protocolo/qr/chave
+        //context.printBPe("BPe-${data.ide.nBP ?: ""}", data)
 
-        ExecutBackgrund();
+        //ExecutBackgrund();
 
 
 
@@ -1057,6 +1082,17 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+    }
+
+    public void Abre_Venda_Qrcode_Sanitario(){
+        Intent myIntent = new Intent(MainActivity.this, ActivateBathroom.class);
+        Bundle bundle = new Bundle();
+
+        bundle.putString("USUARIO", Nome_user);
+
+        myIntent.putExtras(bundle);
+        // chama esse intent e aguarda resultado
+        startForresult.launch(myIntent);
     }
 
 

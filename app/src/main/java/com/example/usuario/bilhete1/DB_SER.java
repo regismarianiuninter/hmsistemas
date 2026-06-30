@@ -11,19 +11,17 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQuery;
 import android.util.Log;
 
-
-
-public class DB_USR extends SQLiteOpenHelper {
+public class DB_SER extends SQLiteOpenHelper {
     /** O nome do arquivo de base de dados no sistema de arquivos */
-    private static final String NOME_BD = "USR";
+    private static final String NOME_BD = "SER";
     /** A versão da base de dados que esta classe compreende. */
-    private static final int VERSAO_BD = 4;
-    private static final String LOG_TAG = "USR";
+    private static final int VERSAO_BD = 1;
+    private static final String LOG_TAG = "SER";
     /** Mantém rastreamento do contexto que nós podemos carregar SQL */
     private final Context contexto;
 
 
-    public DB_USR(Context context) {
+    public DB_SER(Context context) {
         super(context, NOME_BD, null, VERSAO_BD);
         this.contexto = context;
     }
@@ -31,7 +29,7 @@ public class DB_USR extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db)
     {
-        String[] sql = contexto.getString(R.string.DB_USR_onCreate).split("\n");
+        String[] sql = contexto.getString(R.string.DB_SER_onCreate).split("\n");
         db.beginTransaction();
 
         try
@@ -54,7 +52,10 @@ public class DB_USR extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         // If you need to add a column
         if (newVersion > oldVersion) {
-            db.execSQL("ALTER TABLE USR ADD COLUMN Tippvd TEXT DEFAULT ''");
+
+            if (oldVersion < 2) {
+               // db.execSQL("ALTER TABLE SER ADD COLUMN Tipdes TEXT DEFAULT ''");
+            }
         }
     }
 
@@ -72,19 +73,19 @@ public class DB_USR extends SQLiteOpenHelper {
                 db.execSQL(s);
     }
 
-    /*Retorna um USR ordenado
+    /*Retorna um SER ordenado
       @param critério de ordenação
      */
-    public DB_USR.UsrCursor RetornarUsr(DB_USR.UsrCursor.OrdenarPor ordenarPor)
+    public DB_SER.SerCursor RetornarSer(DB_SER.SerCursor.OrdenarPor ordenarPor)
     {
-        String sql = DB_USR.UsrCursor.CONSULTA + (ordenarPor == DB_USR.UsrCursor.OrdenarPor.NomeCrescente ? "ASC" : "DESC");
+        String sql = DB_SER.SerCursor.CONSULTA + (ordenarPor == DB_SER.SerCursor.OrdenarPor.NomeCrescente ? "ASC" : "DESC");
         SQLiteDatabase bd = getReadableDatabase();
-        DB_USR.UsrCursor cc = (DB_USR.UsrCursor) bd.rawQueryWithFactory(new DB_USR.UsrCursor.Factory(), sql, null, null);
+        DB_SER.SerCursor cc = (DB_SER.SerCursor) bd.rawQueryWithFactory(new DB_SER.SerCursor.Factory(), sql, null, null);
         cc.moveToFirst();
         return cc;
     }
 
-    public long InserirUsr(String usrnom, String usrsen, String fectur, String ultatu, String tippvd)
+    public long InserirSer(String tipser, String vlrser)
 
 
 
@@ -94,14 +95,12 @@ public class DB_USR extends SQLiteOpenHelper {
         try
         {
             ContentValues initialValues = new ContentValues();
-            initialValues.put("Usrnom", usrnom);
-            initialValues.put("Usrsen", usrsen);
-            initialValues.put("Fectur", fectur);
-            initialValues.put("Ultatu", ultatu);
-            initialValues.put("Tippvd", tippvd);
+            initialValues.put("Tipser", tipser);
+            initialValues.put("Vlrser", vlrser);
 
 
-            return db.insert("USR", null, initialValues);
+
+            return db.insert("SER", null, initialValues);
         }
         finally
         {
@@ -109,30 +108,28 @@ public class DB_USR extends SQLiteOpenHelper {
         }
     }
 
-    public void deletar_Usr(){
+    public void deletar_SER(){
         SQLiteDatabase db = getWritableDatabase();
         db.delete(NOME_BD, null, null);
         db.close();
     }
 
-    public void Atualizar_Usr(String id, String usrnom, String usrsen, String fectur, String ultatu, String tippvd) {
+    public void Atualizar_Ser(String id, String tipser, String vlrser) {
         SQLiteDatabase db = this.getReadableDatabase();
 
         ContentValues valores = new ContentValues();
         String[] argumentos = {id};
 
-        valores.put("Usrnom", usrnom);
-        valores.put("Usrsen", usrsen);
-        valores.put("Fectur", fectur);
-        valores.put("Ultatu", ultatu);
-        valores.put("Tippvd", tippvd);
+        valores.put("Tipser", tipser);
+        valores.put("Vlrser", vlrser);
 
 
 
-        getWritableDatabase().update("USR", valores, "id=?", argumentos);
+
+        getWritableDatabase().update("SER", valores, "id=?", argumentos);
     }
 
-    public void Atualizar_Campo_Usr(String id, String campo, String novoval){
+    public void Atualizar_Campo_Ser(String id, String campo, String novoval){
         SQLiteDatabase db = this.getReadableDatabase();
 
         ContentValues valores = new ContentValues();
@@ -140,11 +137,11 @@ public class DB_USR extends SQLiteOpenHelper {
 
         valores.put(campo, novoval);
 
-        getWritableDatabase().update("USR", valores, "id=?", argumentos);
+        getWritableDatabase().update("SER", valores, "id=?", argumentos);
 
     }
 
-    public static class UsrCursor extends SQLiteCursor
+    public static class SerCursor extends SQLiteCursor
     {
 
 
@@ -153,9 +150,9 @@ public class DB_USR extends SQLiteOpenHelper {
             NomeDecrescente
         }
 
-        private static final String CONSULTA = "SELECT * FROM USR ORDER BY ID ";
+        private static final String CONSULTA = "SELECT * FROM SER ORDER BY ID ";
 
-        private UsrCursor(SQLiteDatabase db, SQLiteCursorDriver driver, String editTable, SQLiteQuery query)
+        private SerCursor(SQLiteDatabase db, SQLiteCursorDriver driver, String editTable, SQLiteQuery query)
         {
             super(db, driver, editTable, query);
         }
@@ -165,7 +162,7 @@ public class DB_USR extends SQLiteOpenHelper {
             @Override
             public Cursor newCursor(SQLiteDatabase db, SQLiteCursorDriver driver, String editTable, SQLiteQuery query)
             {
-                return new DB_USR.UsrCursor(db, driver, editTable, query);
+                return new DB_SER.SerCursor(db, driver, editTable, query);
             }
         }
 
@@ -173,23 +170,21 @@ public class DB_USR extends SQLiteOpenHelper {
         {
             return getLong(getColumnIndexOrThrow("ID"));
         }
-        public String getUsrnom()
+        public String getTipser()
         {
-            return getString(getColumnIndexOrThrow("Usrnom"));
+            return getString(getColumnIndexOrThrow("Tipser"));
         }
-        public String getUsrsen() { return getString(getColumnIndexOrThrow("Usrsen")); }
-        public String getFectur() { return getString(getColumnIndexOrThrow("Fectur")); }
-        public String getUltatu() { return getString(getColumnIndexOrThrow("Ultatu")); }
-        public String getTippvd() { return getString(getColumnIndexOrThrow("Tippvd")); }
+        public String getVlrser() { return getString(getColumnIndexOrThrow("Vlrser")); }
+
 
 
 
 
     }
 
-    String BuscaUsr(String parametro){
+    String BuscaSer(String parametro){
         String selectQuery =
-                "SELECT * FROM Usr WHERE Usrnom = " + "'" + parametro + "'";
+                "SELECT * FROM SER WHERE Tipser = " + "'" + parametro + "'";
 
 
         SQLiteDatabase banco = this.getWritableDatabase();
@@ -197,35 +192,18 @@ public class DB_USR extends SQLiteOpenHelper {
 
         cursor.moveToFirst();
 
-        String nomeString = cursor.getString(cursor.getColumnIndex("Usrsen"));
+        String valString = cursor.getString(cursor.getColumnIndex("Vlrser"));
 
         StringBuilder conversor = new StringBuilder();
-        conversor.append(nomeString);
+        conversor.append(valString);
         return conversor.toString();
 
     }
 
-    String Busca_Dados_Usr(String parametro, String scampo){
+    String Busca_Dados_Ser(String parametro, String scampo){
         String selectQuery =
-                "SELECT * FROM USR WHERE Usrnom = " + "'" + parametro + "'";
+                "SELECT * FROM SER WHERE Tipser = " + "'" + parametro + "'";
 
-
-
-        SQLiteDatabase banco = this.getWritableDatabase();
-        Cursor cursor = banco.rawQuery(selectQuery, null);
-
-        cursor.moveToFirst();
-        String nomeString = cursor.getString(cursor.getColumnIndex(scampo));
-
-        StringBuilder conversor = new StringBuilder();
-        conversor.append(nomeString);
-        return conversor.toString();
-
-    }
-
-    String Busca_Dados_Usr_ID(int parametro, String scampo){
-        String selectQuery =
-                "SELECT * FROM USR WHERE ID =" + parametro;
 
 
         SQLiteDatabase banco = this.getWritableDatabase();
@@ -240,10 +218,22 @@ public class DB_USR extends SQLiteOpenHelper {
 
     }
 
+    String Busca_Dados_SER_ID(int parametro, String scampo){
+        String selectQuery =
+                "SELECT * FROM SER WHERE ID =" + parametro;
 
 
+        SQLiteDatabase banco = this.getWritableDatabase();
+        Cursor cursor = banco.rawQuery(selectQuery, null);
 
+        cursor.moveToFirst();
+        String nomeString = cursor.getString(cursor.getColumnIndex(scampo));
 
+        StringBuilder conversor = new StringBuilder();
+        conversor.append(nomeString);
+        return conversor.toString();
 
+    }
 
 }
+

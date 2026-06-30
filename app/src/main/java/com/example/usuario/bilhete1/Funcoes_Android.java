@@ -2,12 +2,23 @@ package com.example.usuario.bilhete1;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.pdf.PdfRenderer;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Handler;
+import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.util.Base64;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -24,6 +35,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.HttpRetryException;
@@ -60,6 +72,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
@@ -71,6 +84,7 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import java.security.cert.CertificateException;
+import java.util.UUID;
 
 import javax.net.ssl.SSLProtocolException;
 import javax.xml.parsers.DocumentBuilder;
@@ -79,8 +93,13 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import static android.net.NetworkInfo.State.CONNECTED;
 import static android.os.Environment.getExternalStorageDirectory;
 import static android.os.Environment.getExternalStoragePublicDirectory;
+import static androidx.core.content.ContextCompat.getSystemService;
+
+import androidx.annotation.RequiresApi;
 
 public class Funcoes_Android {
+    private static final String PREFS_NAME = "MyAppPrefs";
+    private static final String KEY_DEVICE_ID = "device_id";
 
 
     static String getCurrentUTC(){
@@ -857,6 +876,93 @@ public class Funcoes_Android {
         return sret;
     }
 
+    public static String getUniqueId(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String uniqueId = prefs.getString(KEY_DEVICE_ID, null);
+
+        if (uniqueId == null) {
+            // Gera um novo UUID se não existir
+            uniqueId = UUID.randomUUID().toString();
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString(KEY_DEVICE_ID, uniqueId);
+            editor.apply();
+        }
+
+        return uniqueId;
+    }
+
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    public static Bitmap pdfToBitmap384(Context ctx, File pdfFile) throws Exception {
+        ParcelFileDescriptor pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
+        PdfRenderer renderer = new PdfRenderer(pfd);
+        PdfRenderer.Page page = renderer.openPage(0);
+
+        int targetW = 384;
+        float scale = targetW / (float) page.getWidth();
+        int targetH = Math.round(page.getHeight() * scale);
+
+        Bitmap bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        canvas.drawColor(Color.WHITE);
+        Matrix m = new Matrix(); m.postScale(scale, scale);
+        page.render(bmp, null, m, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
+
+        page.close(); renderer.close(); pfd.close();
+        return bmp;
+    }
+
+    public static Bitmap ditherToMono(Bitmap src){
+        int w=src.getWidth(), h=src.getHeight();
+        Bitmap out = Bitmap.createBitmap(w,h, Bitmap.Config.ARGB_8888);
+        int[] p = new int[w*h]; src.getPixels(p,0,w,0,0,w,h);
+        float[] err = new float[w*h];
+        for(int y=0;y<h;y++){
+            for(int x=0;x<w;x++){
+                int i=y*w+x, c=p[i];
+                float gray = ((c>>16)&255)*0.299f + ((c>>8)&255)*0.587f + (c&255)*0.114f;
+                gray += err[i];
+                int bit = gray<128 ? 0 : 255;
+                out.setPixel(x,y, Color.rgb(bit,bit,bit));
+                float e = gray - bit;
+                if (x+1<w) err[i+1]+= e*7/16f;
+                if (y+1<h){
+                    if (x>0) err[i+w-1]+= e*3/16f;
+                    err[i+w]+= e*5/16f;
+                    if (x+1<w) err[i+w+1]+= e*1/16f;
+                }
+            }
+        }
+        return out;
+    }
+
+
+    public static void bulk(UsbDeviceConnection c, UsbEndpoint ep, byte[] data) {
+        c.bulkTransfer(ep, data, data.length, 3000);
+    }
+    static void sendRasterImage(OutputStream os, Bitmap mono) throws Exception {
+        int w = mono.getWidth();
+        int h = mono.getHeight();
+        int bytesPerRow = (w + 7) / 8;
+
+        byte[] header = new byte[]{0x1D, 0x76, 0x30, 0x00, 0,0, 0,0}; // m=0
+        header[4] = (byte)(bytesPerRow & 0xFF);
+        header[5] = (byte)((bytesPerRow >> 8) & 0xFF);
+        header[6] = (byte)(h & 0xFF);
+        header[7] = (byte)((h >> 8) & 0xFF);
+        os.write(header);
+
+        byte[] row = new byte[bytesPerRow];
+        for (int y = 0; y < h; y++) {
+            Arrays.fill(row, (byte)0);
+            for (int x = 0; x < w; x++) {
+                int pix = mono.getPixel(x,y) & 0xFF;
+                if (pix == 0) { // preto
+                    row[x >> 3] |= (byte)(0x80 >> (x & 7));
+                }
+            }
+            os.write(row);
+        }
+    }
 
 
 }

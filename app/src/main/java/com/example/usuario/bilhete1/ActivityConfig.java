@@ -121,6 +121,15 @@ public class ActivityConfig extends AppCompatActivity {
                                     EditText formnaokey = findViewById(R.id.edtNaokey);
                                     EditText formmincan = findViewById(R.id.edtMincan);
                                     EditText formndstax = findViewById(R.id.edtNdstax);
+                                    EditText formnomimp = findViewById(R.id.edtNomimp);
+                                    EditText formcodimp = findViewById(R.id.edtCodimp);
+                                    EditText formcliidb = findViewById(R.id.edtCliid);
+                                    EditText formclisec = findViewById(R.id.edtClisec);
+                                    EditText formbancrt = findViewById(R.id.edtBancert);
+                                    EditText formbansen = findViewById(R.id.edtBansen);
+                                    EditText formbanche = findViewById(R.id.edtBanchave);
+                                    EditText formbanwse = findViewById(R.id.edtBanws);
+                                    EditText formidepdv = findViewById(R.id.edtIdepdv);
 
 
                                     DB_EMP dbEmp = new DB_EMP(ActivityConfig.this);
@@ -195,6 +204,15 @@ public class ActivityConfig extends AppCompatActivity {
                                     formnaokey.setText(dbEmp.Busca_Dados_Emp(iID, "Naokey"));
                                     formmincan.setText(dbEmp.Busca_Dados_Emp(iID, "Mincan"));
                                     formndstax.setText(dbEmp.Busca_Dados_Emp(iID, "Ndstax"));
+                                    formnomimp.setText(dbEmp.Busca_Dados_Emp(iID, "Nomimp"));
+                                    formcodimp.setText(dbEmp.Busca_Dados_Emp(iID, "Codimp"));
+                                    formcliidb.setText(dbEmp.Busca_Dados_Emp(iID, "Cliidb"));
+                                    formclisec.setText(dbEmp.Busca_Dados_Emp(iID, "Clisec"));
+                                    formbancrt.setText(dbEmp.Busca_Dados_Emp(iID, "Bancrt"));
+                                    formbansen.setText(dbEmp.Busca_Dados_Emp(iID, "Bansen"));
+                                    formbanche.setText(dbEmp.Busca_Dados_Emp(iID, "Banchv"));
+                                    formbanwse.setText(dbEmp.Busca_Dados_Emp(iID, "Banwse"));
+                                    formidepdv.setText(dbEmp.Busca_Dados_Emp(iID, "Idepdv"));
 
 
                                 }
@@ -343,11 +361,23 @@ public class ActivityConfig extends AppCompatActivity {
         EditText formnaokey = findViewById(R.id.edtNaokey);
         EditText formmincan = findViewById(R.id.edtMincan);
         EditText formndstax = findViewById(R.id.edtNdstax);
+        EditText formnomimp = findViewById(R.id.edtNomimp);
+        EditText formcodimp = findViewById(R.id.edtCodimp);
+        EditText formcliidb = findViewById(R.id.edtCliid);
+        EditText formclisec = findViewById(R.id.edtClisec);
+        EditText formbancrt = findViewById(R.id.edtBancert);
+        EditText formbansen = findViewById(R.id.edtBansen);
+        EditText formbanchv = findViewById(R.id.edtBanchave);
+        EditText formbanwse = findViewById(R.id.edtBanws);
+        EditText formidepdv = findViewById(R.id.edtIdepdv);
+        EditText formbasemb = findViewById(R.id.edtBasemb);
+        EditText formagencia = findViewById(R.id.edtAgencia);
 
         String sID_Old, sID, scnpj, sdescri, sie, sim, scrt, sendere, snum, sbairro, scidade, suf, scep, scodmun;
         String sfone, semail, star, samb, smod, sser, sultimo, stipemi, stipbil, sdatctg, scnae, empspl, saliq, surl;
         String scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003, smodimp, scartao;
-        String sbasseg, snaokey, smincan, sndstax;
+        String sbasseg, snaokey, smincan, sndstax, snomimp, scodimp, scliidb, sclisec, sbanctr, sbansen, sbanchv, sbanwse;
+        String sidepdv, sbasemb, sagencia;
         sID = formID.getText().toString();
         scnpj = formcnpj.getText().toString();
         sdescri = formdescri.getText().toString();
@@ -392,6 +422,17 @@ public class ActivityConfig extends AppCompatActivity {
         snaokey = formnaokey.getText().toString();
         smincan = formmincan.getText().toString();
         sndstax = formndstax.getText().toString();
+        snomimp = formnomimp.getText().toString();
+        scodimp = formcodimp.getText().toString();
+        scliidb = formcliidb.getText().toString();
+        sclisec = formclisec.getText().toString();
+        sbanctr = formbancrt.getText().toString();
+        sbansen = formbansen.getText().toString();
+        sbanchv = formbanchv.getText().toString();
+        sbanwse = formbanwse.getText().toString();
+        sidepdv = formidepdv.getText().toString();
+        sbasemb = formbasemb.getText().toString();
+        sagencia = formagencia.getText().toString();
         sID_Old = ID_Old;
 
 
@@ -400,7 +441,8 @@ public class ActivityConfig extends AppCompatActivity {
         dbemp.Atualizar_Emp(sID_Old,sID,scnpj, sdescri, sie, sim, scrt, sendere, snum, sbairro, scidade, suf, scodmun,
                 scep, sfone, semail, star, samb, smod, sser, sultimo, stipemi, stipbil, sdatctg,  scnae, empspl, saliq, surl,
                 scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003, smodimp, "",
-                scartao, sbasseg, snaokey, smincan, "", sndstax);
+                scartao, sbasseg, snaokey, smincan, "", sndstax, snomimp, scodimp, scliidb, sclisec, sbanctr, sbansen,
+                sbanchv, sbanwse, sidepdv, sbasemb, sagencia);
     }
 
     public void Criar_Config_Txt(){
@@ -470,7 +512,9 @@ public class ActivityConfig extends AppCompatActivity {
                 DB_EMP dbemp = new DB_EMP(this);
                     dbemp.InserirEmp(scnpj, sdescri, sie, sim, scrt, sendere, snum, sbairro, scidade, suf, scodmun,
                             scep, sfone, semail, sTar, samb, smod, sser, sultbil, stipemi, stipbil, sdatctg, scnae, sempspl,
-                            saliq, surl, scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003, "", "", "", "", "", "", "", "");
+                            saliq, surl, scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003,
+                            "", "", "", "", "", "", "", "", "", "",
+                            "", "", "", "", "", "", "", "", "");
 
 
             }
@@ -527,12 +571,23 @@ public class ActivityConfig extends AppCompatActivity {
         EditText formnaokey = findViewById(R.id.edtNaokey);
         EditText formmincan = findViewById(R.id.edtMincan);
         EditText formndstax = findViewById(R.id.edtNdstax);
-
+        EditText formnomimp = findViewById(R.id.edtNomimp);
+        EditText formcodimp = findViewById(R.id.edtCodimp);
+        EditText formcliidb = findViewById(R.id.edtCliid);
+        EditText formclisec = findViewById(R.id.edtClisec);
+        EditText formbancrt = findViewById(R.id.edtBancert);
+        EditText formbansen = findViewById(R.id.edtBansen);
+        EditText formbanchv = findViewById(R.id.edtBanchave);
+        EditText formbanwse = findViewById(R.id.edtBanws);
+        EditText formidepdv = findViewById(R.id.edtIdepdv);
+        EditText formbasemb = findViewById(R.id.edtBasemb);
+        EditText formagencia = findViewById(R.id.edtAgencia);
 
         String sID_Old, sID, scnpj, sdescri, sie, sim, scrt, sendere, snum, sbairro, scidade, suf, scep, scodmun;
         String sfone, semail, star, samb, smod, sser, sultimo, stipemi, stipbil, sdatctg, scnae, sempspl, saliq, surl;
         String scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003, smodimp, scartao;
-        String sbasseg, snaokey, smincan, sndstax;
+        String sbasseg, snaokey, smincan, sndstax, snomimp, scodimp, scliidb, sclisec, sbanctr, sbansen, sbanchv, sbanwse;
+        String sidepdv, sbasemb, sagencia;
         sID = formID.getText().toString();
         scnpj = formcnpj.getText().toString();
         sdescri = formdescri.getText().toString();
@@ -577,13 +632,25 @@ public class ActivityConfig extends AppCompatActivity {
         snaokey = formnaokey.getText().toString();
         smincan = formmincan.getText().toString();
         sndstax = formndstax.getText().toString();
+        snomimp = formnomimp.getText().toString();
+        scodimp = formcodimp.getText().toString();
+        scliidb = formcliidb.getText().toString();
+        sclisec = formclisec.getText().toString();
+        sbanctr = formbancrt.getText().toString();
+        sbansen = formbansen.getText().toString();
+        sbanchv = formbanchv.getText().toString();
+        sbanwse = formbanwse.getText().toString();
+        sidepdv = formidepdv.getText().toString();
+        sbasemb = formbasemb.getText().toString();
+        sagencia = formagencia.getText().toString();
 
 
         DB_EMP dbemp = new DB_EMP(this);
         dbemp.InserirEmp(scnpj, sdescri, sie, sim, scrt, sendere, snum, sbairro, scidade, suf, scodmun,
                 scep, sfone, semail, star, samb, smod, sser, sultimo, stipemi, stipbil, sdatctg, scnae, sempspl,
                 saliq, surl, scrtemp, scrtsen, salitri, smaximp, sconvei, spvenda, sendews, srsv001, srsv002, srsv003,
-                smodimp, "", scartao, sbasseg, snaokey, smincan, "", sndstax);
+                smodimp, "", scartao, sbasseg, snaokey, smincan, "", sndstax, snomimp, scodimp,
+                scliidb, sclisec, sbanctr, sbansen, sbanchv, sbanwse, sidepdv, sbasemb, sagencia);
     }
 
 
@@ -684,7 +751,10 @@ public class ActivityConfig extends AppCompatActivity {
                                                     dbemp.deletar_Emp();
                                                     dbemp.InserirEmp(scnpj, sdescri, sinsest, sinsmun, scrt, sendere, snum, sbairro, scid, suf, scodmun,
                                                             scep, stel, semail, star, samb, smod, sser, "0", "1", "0", "", scnae, sempspl,
-                                                            salibil, "https://dfe-portal.svrs.rs.gov.br/bpe/qrcode", "", "", salitri, "0", "N", "E", sendews, "xx", "xx", "xx", "", "", "", "", "", "", "", "");
+                                                            salibil, "https://dfe-portal.svrs.rs.gov.br/bpe/qrcode", "", "", salitri, "0",
+                                                            "N", "E", sendews, "xx", "xx", "xx", "", "", "", "",
+                                                            "", "", "", "", "", "", "", "", "", "", "",
+                                                            "", "", "", "");
                                                 }
                                                 NodeList nodeLinhas = empElement.getElementsByTagName("tLinhas");
                                                 for (int tempLinhas = 0; tempLinhas < nodeLinhas.getLength(); tempLinhas++) {
@@ -786,7 +856,7 @@ public class ActivityConfig extends AppCompatActivity {
                                                             String snome = ageElement.getElementsByTagName("sNome").item(0).getTextContent();
                                                             String ssenha = ageElement.getElementsByTagName("sSenha").item(0).getTextContent();
                                                             String sfectur = ageElement.getElementsByTagName("sFectur").item(0).getTextContent();
-                                                            dbusr.InserirUsr(snome, ssenha, sfectur, "");
+                                                            dbusr.InserirUsr(snome, ssenha, sfectur, "", "");
 
 
                                                         }

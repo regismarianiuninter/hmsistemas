@@ -18,6 +18,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.example.usuario.bilhete1.DB_EMP;
 import com.example.usuario.bilhete1.EscPosBase;
+import com.example.usuario.bilhete1.ParametrosActivity;
 import com.example.usuario.bilhete1.R;
 import com.example.usuario.bilhete1.Utils.Mode;
 import com.example.usuario.bilhete1.ViaActivity;
@@ -117,8 +118,19 @@ public class PrintfManager {
             }
             //SharedPreferencesManager.saveBluetoothName(context, device.getName());
             //SharedPreferencesManager.saveBluetoothAddress(context, device.getAddress());
-            SharedPreferencesManager.saveBluetoothName(context, "DTS2500");
-            SharedPreferencesManager.saveBluetoothAddress(context, "DC:0D:30:40:3D:C4");
+            DB_EMP dbemp = new DB_EMP(context);
+            String snomimp = dbemp.Busca_Dados_Emp(1, "Nomimp");
+            String scodimp = dbemp.Busca_Dados_Emp(1, "Codimp");
+            String snomimpdev = device.getName();
+            String scodimpdev = device.getAddress();
+            if (scodimp.equals("") || (!scodimp.equals(scodimpdev) && scodimpdev.equals(""))) {//se nao encontrar, buscar do dispositivo
+                snomimp = snomimpdev;
+                scodimp = scodimpdev;
+                dbemp.Atualizar_Campo_Emp("1", "Nomimp", snomimp);
+                dbemp.Atualizar_Campo_Emp("1", "Codimp", scodimp);
+            }
+            SharedPreferencesManager.saveBluetoothName(context, snomimp);
+            SharedPreferencesManager.saveBluetoothAddress(context, scodimp);
             try {
                 bluetoothSocket = device.createRfcommSocketToServiceRecord(
                         UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"));
@@ -185,7 +197,7 @@ public class PrintfManager {
         }
     }
 
-    public void printf_50(String companyName, String operator, String remark, List<Mode> modeList) {
+    public void printf_50(String companyName, String operator, String remark, String susuario, List<Mode> modeList) {
         if (!isConnect()) {
             handler.post(() -> Toast.makeText(context, "Impressora não conectada", Toast.LENGTH_SHORT).show());
             return;
@@ -204,9 +216,10 @@ public class PrintfManager {
                 outputStream.write(bytes);
                 */
                 // Imprimir dados
-                printTwoColumn(context.getString(R.string.company_name), companyName);
+                DB_EMP dbemp = new DB_EMP(context);
+                printTwoColumn("", dbemp.Busca_Dados_Emp(1, "Descri"));
                 printfWrap();
-                printTwoColumn(context.getString(R.string.operator), operator);
+                printTwoColumn(context.getString(R.string.operator), susuario);
                 printfWrap();
                 printTwoColumn(context.getString(R.string.time), Util.stampToDate(System.currentTimeMillis()));
                 printfWrap();
@@ -235,7 +248,7 @@ public class PrintfManager {
                 printfWrap();
                 outputStream.write(remark.getBytes(Charset.forName("UTF-8")));
                 printfWrap(4);
-                outputStream.write(new byte[]{0x1D, 0x56, 0x00}); // Cortar papel
+                //outputStream.write(new byte[]{0x1D, 0x56, 0x00}); // Cortar papel
                 outputStream.flush();
             } catch (IOException e) {
                 Log.e(TAG, "Erro ao imprimir", e);
@@ -386,7 +399,7 @@ public class PrintfManager {
                 //buffer.write(new byte[]{0x1D, 0x56, 0x00}); // Testar Cortar papel usando 0x01
                 outputStream.write(buffer.toByteArray());
                 outputStream.flush();
-
+                //outputStream.write(new byte[]{0x1D, 0x56, 0x01}); // Cortar papel
             } catch (IOException e) {
                 Log.e(TAG, "Erro ao imprimir buffer", e);
                 handler.post(() -> Toast.makeText(context, "Erro ao imprimir", Toast.LENGTH_SHORT).show());
@@ -396,7 +409,7 @@ public class PrintfManager {
 
     public void printf_80(String companyName, String operator, String remark, List<Mode> modeList) {
         // AR-2500 é 58 mm, então redireciona para printf_50
-        printf_50(companyName, operator, remark, modeList);
+        printf_50(companyName, operator, remark, "", modeList);
     }
 
     public static int getCenterLeft(int paperWidth, Bitmap bitmap) {

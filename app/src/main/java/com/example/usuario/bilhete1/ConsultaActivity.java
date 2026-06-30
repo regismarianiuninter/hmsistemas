@@ -17,6 +17,11 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteException;
+
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -29,6 +34,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.usuario.bilhete1.Utils.Mode;
+import com.example.usuario.bilhete1.Utils.PrintfBlueListActivity;
+import com.example.usuario.bilhete1.Utils.PrintfManager;
+import com.example.usuario.bilhete1.Utils.Util;
 import com.sunmi.utils.MemInfo;
 import com.sunmi.utils.ThreadPoolManager;
 
@@ -130,6 +139,9 @@ public class ConsultaActivity extends AppCompatActivity {
 
     private static final int REQUEST_ENABLE_BT = 100;
     private BluetoothDevice printerBluetooth;
+    private PrintfManager printfManager;
+    private List<Mode> listData;
+    private Context context;
 
 
     private ServiceConnection connService = new ServiceConnection() {
@@ -206,6 +218,10 @@ public class ConsultaActivity extends AppCompatActivity {
         EditText edtuser = findViewById(R.id.edtUsrvenda);
         edtuser.setText(Nome_user);
 
+        context = this;
+        ///Ativar Impressora AR-2500
+        initData();
+
 
         //Limpar Base temporaria
         DB_TMP RELTMP = new DB_TMP(ConsultaActivity.this);
@@ -267,18 +283,18 @@ public class ConsultaActivity extends AppCompatActivity {
                     txtaguarde.setText("Aguarde...");
                     txtaguarde.setText("");
                 }
-                if (smodimp.equals("03")) { //SUNMI
+                if (smodimp.equals("03") || smodimp.equals("05")) { //Arny ou AR-2500
                     BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
                     if (bluetoothAdapter.isEnabled()) {
                         if (cklist.isChecked()) {
                             txtaguarde.setText("Aguarde...");
-
-                            Listar_Vendas_BT();
-
+                            if (smodimp.equals("03")) { Listar_Vendas_BT();}
+                            if (smodimp.equals("05")) { Listar_Vendas_DTS();}//AR-2500
                             txtaguarde.setText("");
                         } else {
                             txtaguarde.setText("Aguarde...");
-                            Listar_Vendas_Agrupado_BT();
+                            if (smodimp.equals("03")) {Listar_Vendas_Agrupado_BT();}
+                            if (smodimp.equals("05")) { Listar_Vendas_Agrupado_DTS();}//AR-2500
                             txtaguarde.setText("");
                         }
                     } else {
@@ -306,7 +322,43 @@ public class ConsultaActivity extends AppCompatActivity {
         }
         ckbger.setChecked(false);
 
+
+
     }
+
+    ActivityResultLauncher<Intent> resultadoImpressora = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), new ActivityResultCallback<ActivityResult>() {
+        @Override
+        public void onActivityResult(ActivityResult result) {
+            if (result != null) {
+                EditText edtimp = findViewById(R.id.edtImpressora);
+                EditText edtid = findViewById(R.id.edtIDimp);
+                DB_EMP dbemp = new DB_EMP(ConsultaActivity.this);
+                edtimp.setText(dbemp.Busca_Dados_Emp(1, "Nomimp"));
+                edtid.setText(dbemp.Busca_Dados_Emp(1, "Codimp"));
+            }
+        }
+    });
+
+    private void initData() {
+        try {
+            printfManager = PrintfManager.getInstance(context);
+            if (printfManager == null) {
+                Log.e(TAG, "Falha ao inicializar PrintfManager");
+                Util.ToastText(context, "Erro: Falha ao inicializar impressora");
+                return;
+            }
+            if (!printfManager.isConnect()) {
+                listData = new ArrayList<>();
+                listData.add(new Mode("Test-P26", 200, 320));
+                listData.add(new Mode("Test-P16", 20, 188));
+                printfManager.defaultConnection(context);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro em initData: " + e.getMessage());
+            Util.ToastText(context, "Erro ao inicializar dados");
+        }
+    }
+
 
 
     public void Listar_Vendas() {
@@ -985,7 +1037,7 @@ public class ConsultaActivity extends AppCompatActivity {
 
 
                                     } else {
-                                        RELTMP.InserirTmp(scodigo, svia, susr, semissao, "1", String.format("%.2f", (nvlrpas)), "", "", "");
+                                        RELTMP.InserirTmp(scodigo, svia, susr, semissao, "1", String.format("%.2f", (nvlrpas)), "", "", "", "", "");
                                     }
 
 
@@ -1466,7 +1518,7 @@ public class ConsultaActivity extends AppCompatActivity {
                 String sdia, smes, sano, sdatemi;
                 String sviagem = "";
                 String snomeuser = "";
-                double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, vlrvale, vlrembd, vlrembo;
+                double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, vlrvale, vlrembd, vlrembo, vlrpix, vlrembp;
                 vlrtot = 0;
                 vlrsub = 0;
                 vlrusr = 0;
@@ -1478,6 +1530,8 @@ public class ConsultaActivity extends AppCompatActivity {
                 vlrvale = 0;
                 vlrembd = 0;
                 vlrembo = 0;
+                vlrpix = 0;
+                vlrembp = 0;
                 Integer iqtdbil = 0;
                 Integer iqtdsub = 0;
                 Integer iqtdusr = 0;
@@ -1731,6 +1785,9 @@ public class ConsultaActivity extends AppCompatActivity {
                             if (stippag.equals("05")) {
                                 vlrvale = vlrvale + vlrbil;
                             }
+                            if (stippag.equals("06")) {
+                                vlrpix = vlrpix + vlrbil;
+                            }
 
 
                             //Verificar se foi cobrada taxa de embarque
@@ -1738,7 +1795,8 @@ public class ConsultaActivity extends AppCompatActivity {
                             if (vlremb > 0) {
                                 totalemb = (totalemb + vlremb);
                                 if (stippag.equals("05") || stippag.equals("06")) { //se for vale transp ou Pix
-                                    vlrembo = vlrembo + vlremb;
+                                    if (stippag.equals("05")) {  vlrembo = vlrembo + vlremb;}
+                                    if (stippag.equals("06")) {  vlrembp = vlrembp + vlremb;}
                                     Log.i(TAG, "Forma: " + stippag + " = " + vlrembo);
                                 } else {
                                     vlrembd = vlrembd + vlremb;
@@ -1750,6 +1808,9 @@ public class ConsultaActivity extends AppCompatActivity {
                             sval = sval.replace(".", ",");
                             if (cklist.isChecked()) { //se marcou para imprimir todos os bilhetes
                                 out.write(strecho.getBytes(StandardCharsets.UTF_8));
+                                out.write(EscPosBase.nextLine());
+                                String sforpag = "Forma: " + stippag;
+                                out.write(sforpag.getBytes(StandardCharsets.UTF_8));
                                 out.write(EscPosBase.nextLine());
                                 out.write(EscPosBase.alignRight());//Direita
 
@@ -1968,7 +2029,7 @@ public class ConsultaActivity extends AppCompatActivity {
 
 
                     ///Taxa de embarque por forma de pagamento
-                    if (vlrembd > 0 || vlrembo > 0) {
+                    if (vlrembd > 0 || vlrembo > 0 || vlrembp > 0) {
                         if (vlrembd > 0) {//Dinheiro
                             String staxad = String.format("%.2f", vlrembd);
                             staxa = staxad.replace(".", ",");
@@ -2002,6 +2063,23 @@ public class ConsultaActivity extends AppCompatActivity {
                             out.write(EscPosBase.nextLine(2));
 
                         }
+                        if (vlrembp > 0) { // Pix
+                            String staxap = String.format("%.2f", vlrembp);
+                            staxap = staxap.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxp = "TX em Pix: " + staxap;
+                            iqtd = svlrtaxp.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembp = "TX em Pix: " + sespaco + staxap;
+                            out.write(staxembp.getBytes(StandardCharsets.UTF_8));
+                            out.write(EscPosBase.nextLine(2));
+
+                        }
                     }
 
                     totliq = vlrtot - totalemb;
@@ -2022,24 +2100,43 @@ public class ConsultaActivity extends AppCompatActivity {
 
                 }
                 //RESUMO POR FORMA DE PAGAMENTO
-                if (vlrvale > 0) {
+                if (vlrvale > 0 || vlrpix > 0) {
                     out.write(EscPosBase.nextLine(2));
-                    String stotvale = String.format("%.2f", vlrvale);
-                    stotvale = stotvale.replace(".", ",");
-                    sespaco = "";
-                    String stotalvale = "Vale Transporte: " + stotvale;
-                    iqtd = stotalvale.length();
-                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
-                        Integer iresto = (32 - iqtd);
-                        while (sespaco.length() < iresto) {
-                            sespaco = " " + sespaco;
+                    if (vlrvale > 0) {
+                        String stotvale = String.format("%.2f", vlrvale);
+                        stotvale = stotvale.replace(".", ",");
+                        sespaco = "";
+                        String stotalvale = "Vale Transporte: " + stotvale;
+                        iqtd = stotalvale.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
                         }
+                        stotalvale = "Vale Transporte: " + sespaco + stotvale;
+                        out.write(stotalvale.getBytes(StandardCharsets.UTF_8));
                     }
-                    stotalvale = "Vale Transporte: " + sespaco + stotvale;
-                    out.write(stotalvale.getBytes(StandardCharsets.UTF_8));
-                    out.write(EscPosBase.nextLine());
-                    if (vlrtot > vlrvale) {
-                        double vlrdin = (vlrtot - vlrvale);
+                    if (vlrpix > 0) {
+                        out.write(EscPosBase.nextLine(2));
+                        String stotpix = String.format("%.2f", vlrpix);
+                        stotpix = stotpix.replace(".", ",");
+                        sespaco = "";
+                        String stotalpix = "PIX: " + stotpix;
+                        iqtd = stotalpix.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        stotalpix = "PIX: " + sespaco + stotpix;
+                        out.write(stotalpix.getBytes(StandardCharsets.UTF_8));
+                        out.write(EscPosBase.nextLine());
+                    }
+                    if (vlrtot > (vlrvale+vlrpix)) {
+                        out.write(EscPosBase.nextLine(2));
+                        double vlrdin = (vlrtot - (vlrvale+vlrpix));
                         String stotdin = String.format("%.2f", vlrdin);
                         stotdin = stotdin.replace(".", ",");
                         sespaco = "";
@@ -2147,10 +2244,675 @@ public class ConsultaActivity extends AppCompatActivity {
 
     }
 
+    //AR-2500
+    @SuppressLint("MissingPermission")
+    public void Listar_Vendas_DTS() {
+            if (printfManager == null) {
+                Intent myIntent = new Intent(ConsultaActivity.this, PrintfBlueListActivity.class);
+                Bundle bundle = new Bundle();
+                bundle.putString("USUARIO", Nome_user);
+                myIntent.putExtras(bundle);
+                resultadoImpressora.launch(myIntent);
+            }
+            if (printfManager.isConnect()) {
+                try {
+                    List<PrintfManager.PrintCommand> commands = new ArrayList<>();
+
+                String sdia, smes, sano, sdatemi;
+                String sviagem = "";
+                String snomeuser = "";
+                double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, vlrvale, vlrembd, vlrembo;
+                vlrtot = 0;
+                vlrsub = 0;
+                vlrusr = 0;
+                vlrdig = 0;
+                vlrdia = 0;
+                totalemb = 0;
+                vlremb = 0;
+                totliq = 0;
+                vlrvale = 0;
+                vlrembd = 0;
+                vlrembo = 0;
+                Integer iqtdbil = 0;
+                Integer iqtdsub = 0;
+                Integer iqtdusr = 0;
+                Integer iqtdcan = 0;
+                Integer iqtddig = 0;
+                Integer iqtdpen = 0;
+                Integer iqtddia = 0;
+                String sDatcaixa = "";
+
+                // int iret = XmlPontos("C", 0, "Origem", "Destino");
+                //iret = XmlPontos("A", 0, "Origem", "Destino");
+                //Dados a Empresa
+                DB_EMP dbemp = new DB_EMP(getApplicationContext());
+
+                String sespacos = dbemp.Busca_Dados_Emp(1, "Rsv003");
+
+                CheckBox cklist = findViewById(R.id.ckbListar);
+                CheckBox ckfecha = findViewById(R.id.ckbFectur);
+                CheckBox ckbger = findViewById(R.id.ckbGeral);
+                String sgeral = "";
+                if (ckbger.isChecked()) {
+                    sgeral = "S";
+                }
+
+                String sdathor = Funcoes_Android.getCurrentUTC();
+                sano = sdathor.substring(0, (4));
+                smes = sdathor.substring(5, (7));
+                sdia = sdathor.substring(8, (10));
+                sdatemi = sdia + "/" + smes + "/" + sano;
+                EditText edtuser = findViewById(R.id.edtUsrvenda);
+                String susuario = edtuser.getText().toString();
+
+                String sdatimp = "Data de Impressao: " + sdatemi;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "B", sdatimp, 1));
+
+                DB_BPE db = new DB_BPE(ConsultaActivity.this);
+                DB_BPE.BpeCursor cursor = db.RetornarBpe(DB_BPE.BpeCursor.OrdenarPor.NomeCrescente);
+
+                for (int ibp = 0; ibp < cursor.getCount(); ibp++) {
+                    cursor.moveToPosition(ibp);
+                    String sdatven = cursor.getDatemi();
+                    String sdatsai = sdatven.substring(0, (10));
+                    String sagente = cursor.getAgente();
+                    String sfecha = cursor.getTippas();
+                    String stransf = cursor.getTransf();
+                    if (!stransf.equals("S")) {
+                        iqtdpen = iqtdpen + 1;
+                    }
+                    if (!sfecha.equals("S") || sgeral.equals("S")) { //se ainda nao fechou turno ou se imprime todos
+                        String sSitbpe = cursor.getSitbpe();
+
+                        String scancel = cursor.getRsv001(); //se marcou para cancelar
+
+                        System.out.println("N: " + cursor.getNumbpe() + "Sit: " + sSitbpe + " Cancel: " + scancel);
+                        if ((sSitbpe.equals("BA") && !scancel.equals("S")) || (sSitbpe.equals("CT") && !scancel.equals("S"))) { //Autorizados e contingencia
+
+
+                            String slinha = cursor.getNomvia();
+                            if (!slinha.equals(sviagem)) {
+                                if (iqtdsub > 0) { //imprimir subtotal
+
+                                    String subtotal = String.format("%.2f", vlrsub);
+                                    subtotal = subtotal.replace(".", ",");
+
+
+                                    String sespaco = "";
+                                    String sqtd = "Bilhetes da Viagem: " + iqtdsub;
+                                    Integer iqtd = sqtd.length();
+                                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                        Integer iresto = (32 - iqtd);
+                                        while (sespaco.length() < iresto) {
+                                            sespaco = " " + sespaco;
+                                        }
+                                    }
+                                    if (cklist.isChecked()) {
+                                        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 1));
+                                    }
+                                    String sbilvia = "Bilhetes da Viagem: " + sespaco + iqtdsub;
+                                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilvia, 1));
+
+
+                                    sespaco = "";
+                                    String svalor = "Total da Viagem: " + subtotal;
+                                    iqtd = svalor.length();
+                                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                        Integer iresto = (32 - iqtd);
+                                        while (sespaco.length() < iresto) {
+                                            sespaco = " " + sespaco;
+                                        }
+                                    }
+                                    String stotvia = "Total da Viagem: " + sespaco + subtotal;
+                                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotvia, 1));
+
+                                    if (cklist.isChecked()) {
+                                        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 2));
+                                    } else {
+                                        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 1));
+                                    }
+
+                                    vlrsub = 0;
+                                    iqtdsub = 0;
+                                } else {
+                                    commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 1));
+                                }
+
+                                if (!sdatsai.equals(sDatcaixa)) { //se a data for diferente
+                                    if (iqtddia > 0) {
+                                        String subtot = String.format("%.2f", vlrdia);
+                                        subtot = subtot.replace(".", ",");
+
+
+                                        String sespaco = "";
+                                        String sqtd = "Bilhetes da Data: " + iqtddia;
+                                        Integer iqtd = sqtd.length();
+                                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                            Integer iresto = (32 - iqtd);
+                                            while (sespaco.length() < iresto) {
+                                                sespaco = " " + sespaco;
+                                            }
+                                        }
+                                        String sbildat = "Bilhetes da Data: " + sespaco + iqtddia;
+                                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbildat, 1));
+
+
+
+                                        sespaco = "";
+                                        String svalor = "Total da Data: " + subtot;
+                                        iqtd = svalor.length();
+                                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                            Integer iresto = (32 - iqtd);
+                                            while (sespaco.length() < iresto) {
+                                                sespaco = " " + sespaco;
+                                            }
+                                        }
+                                        String stotdat = "Total da Data: " + sespaco + subtot;
+                                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotdat, 2));
+
+
+
+                                        vlrdia = 0;
+                                        iqtddia = 0;
+                                    } else {
+                                        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 1));
+                                    }
+                                    String sdiad, smesd, sanod, sdata;
+                                    sanod = sdatsai.substring(0, (4));
+                                    smesd = sdatsai.substring(5, (7));
+                                    sdiad = sdatsai.substring(8, (10));
+                                    sdata = sdiad + "/" + smesd + "/" + sanod;
+                                    String svendasdat = "Data da Venda: " + sdata;
+                                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", svendasdat, 1));
+
+                                    sDatcaixa = sdatsai;
+
+
+                                } //if (!sdatsai.equals(sDatcaixa)) { //se a data for diferente
+
+                                String snome = cursor.getAgente();
+                                if (!snome.equals(snomeuser)) {
+                                    if (iqtdusr > 0) { //subtotal do Usuario
+
+                                        String usrtotal = String.format("%.2f", vlrusr);
+                                        usrtotal = usrtotal.replace(".", ",");
+
+
+                                        String sespaco = "";
+                                        String sqtd = "Bilhetes do Usuario: " + iqtdusr;
+                                        Integer iqtd = sqtd.length();
+                                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                            Integer iresto = (32 - iqtd);
+                                            while (sespaco.length() < iresto) {
+                                                sespaco = " " + sespaco;
+                                            }
+                                        }
+                                        String sbilusr = "Bilhetes do Usuario: " + sespaco + iqtdusr;
+                                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilusr, 1));
+
+
+                                        sespaco = "";
+                                        String svalor = "Total do Usuario: " + usrtotal;
+                                        iqtd = svalor.length();
+                                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                            Integer iresto = (32 - iqtd);
+                                            while (sespaco.length() < iresto) {
+                                                sespaco = " " + sespaco;
+                                            }
+                                        }
+                                        String stotusr = "Total do Usuario: " + sespaco + usrtotal;
+                                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotusr, 1));
+                                        vlrusr = 0;
+                                        iqtdusr = 0;
+                                    }
+
+
+                                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 1));
+                                    String snomusr = "USUARIO: " + snome;
+                                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", snomusr, 1));
+
+                                    snomeuser = snome;
+                                }
+
+
+                                int posV = slinha.indexOf("-");
+                                int iqtdv = slinha.length();
+                                String sVia = slinha.substring((posV + 1), (iqtdv));
+                                commands.add(new PrintfManager.PrintCommand("L", "N", "N", sVia, 1));
+
+                                sviagem = slinha;
+
+
+                            }
+                            System.out.println("Dentro do bpe");
+                            String sbilhete = cursor.getNumbpe();
+                            String sori = cursor.getTreori();
+                            String sdes = cursor.getTredes();
+                            String sval = cursor.getVlrpas();
+
+                            int posO = sori.indexOf("-");
+                            int iqtdo = sori.length();
+                            String sOri = sori.substring((posO + 1), (iqtdo));
+
+
+                            int posD = sdes.indexOf("-");
+                            int iqtdd = sdes.length();
+                            String sDes = sdes.substring((posD + 1), (iqtdd));
+
+
+                            //Log.i(TAG,"Taxbem: " + vlremb);
+
+
+                            String strecho = sOri + "x" + sDes;
+                            sval = sval.replace(",", ".");
+                            vlrbil = Double.valueOf(sval).doubleValue();
+                            vlrtot = vlrtot + vlrbil;
+                            vlrsub = vlrsub + vlrbil;
+                            vlrusr = vlrusr + vlrbil;
+                            vlrdia = vlrdia + vlrbil;
+                            String stippag = cursor.getPagmto();
+                            if (stippag.equals("05")) {
+                                vlrvale = vlrvale + vlrbil;
+                            }
+
+
+                            //Verificar se foi cobrada taxa de embarque
+                            vlremb = Double.valueOf(cursor.getVlremb()).doubleValue();
+                            if (vlremb > 0) {
+                                totalemb = (totalemb + vlremb);
+                                if (stippag.equals("05") || stippag.equals("06")) { //se for vale transp ou Pix
+                                    vlrembo = vlrembo + vlremb;
+                                    Log.i(TAG, "Forma: " + stippag + " = " + vlrembo);
+                                } else {
+                                    vlrembd = vlrembd + vlremb;
+                                    Log.i(TAG, "Forma: " + stippag + " = " + vlrembd);
+                                }
+                            }
+
+                            sval = String.format("%.2f", (vlrbil));
+                            sval = sval.replace(".", ",");
+                            if (cklist.isChecked()) { //se marcou para imprimir todos os bilhetes
+                                commands.add(new PrintfManager.PrintCommand("L", "N", "N", strecho, 1));
+
+                                String shorbil = sdatven.substring(11, (16));
+                                String sespaco = "";
+                                String svalor = "Bilhete: " + sbilhete + "  " + shorbil + "   " + sval;
+                                Integer iqtd = svalor.length();
+                                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                    Integer iresto = (32 - iqtd);
+                                    while (sespaco.length() < iresto) {
+                                        sespaco = " " + sespaco;
+                                    }
+                                }
+                                String sdetbil = "Bilhete: " + sbilhete + "  " + shorbil + "   " + sval;
+                                commands.add(new PrintfManager.PrintCommand("R", "N", "N", sdetbil, 1));
+
+                            }
+                            iqtdsub = iqtdsub + 1;
+                            iqtdbil = iqtdbil + 1;
+                            iqtdusr = iqtdusr + 1;
+                            iqtddia = iqtddia + 1;
+
+
+                        } else if (sSitbpe.equals("CA")) {
+                            iqtdcan = iqtdcan + 1;
+                        } else if (sSitbpe.equals("DG")) {
+                            iqtddig = iqtddig + 1;
+                            String sval = cursor.getVlrpas();
+                            vlrbil = Double.valueOf(sval).doubleValue();
+                            vlrdig = vlrdig + vlrbil;
+
+                        }
+
+                        if (sSitbpe.equals("CT") && scancel.equals("S")) {
+                            iqtdcan = iqtdcan + 1;
+                        }
+
+                        if (sSitbpe.equals("BA") && scancel.equals("S")) {
+                            iqtdcan = iqtdcan + 1;
+                        }
+
+                        if (ckfecha.isChecked()) { ///marcar como fechado
+                            String snum = cursor.getNumbpe();
+                            String sid = db.Busca_Dados_Bpe(snum, "ID");
+                            db.Atualizar_Campo_Bpe(sid, "Tippas", "S");
+
+                        }
+                    }
+                }
+
+
+                if (iqtdsub > 0) { //imprimir subtotal da viagem
+                    String subtotal = String.format("%.2f", vlrsub);
+                    subtotal = subtotal.replace(".", ",");
+
+
+                    String sespaco = "";
+                    String sqtd = "Bilhetes da Viagem: " + iqtdsub;
+                    Integer iqtd = sqtd.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    if (cklist.isChecked()) {
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 1));
+                    }
+                    String sbilvia = "Bilhetes da Viagem: " + sespaco + iqtdsub;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilvia, 1));
+
+                    sespaco = "";
+                    String svalor = "Total da Viagem: " + subtotal;
+                    iqtd = svalor.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String stotvia = "Total da Viagem: " + sespaco + subtotal;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotvia, 1));
+                    if (cklist.isChecked()) {
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 2));
+                    } else {
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 1));
+                    }
+
+
+                }
+
+
+                if (iqtddia > 0) {
+                    String subtot = String.format("%.2f", vlrdia);
+                    subtot = subtot.replace(".", ",");
+
+
+                    String sespaco = "";
+                    String sqtd = "Bilhetes da Data: " + iqtddia;
+                    Integer iqtd = sqtd.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String sbildat = "Bilhetes da Data: " + sespaco + iqtddia;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbildat, 1));
+
+                    sespaco = "";
+                    String svalor = "Total da Data: " + subtot;
+                    iqtd = svalor.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String stotdat = "Total da Data: " + sespaco + subtot;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotdat, 1));
+
+                }
+
+                if (iqtdusr > 0) { //subtotal do Usuario
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 1));
+                    String usrtotal = String.format("%.2f", vlrusr);
+                    usrtotal = usrtotal.replace(".", ",");
+
+
+                    String sespaco = "";
+                    String sqtd = "Bilhetes do Usuario: " + iqtdusr;
+                    Integer iqtd = sqtd.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String sbilusr = "Bilhetes do Usuario: " + sespaco + iqtdusr;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilusr, 1));
+
+                    sespaco = "";
+                    String svalor = "Total do Usuario: " + usrtotal;
+                    iqtd = svalor.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String stotusr = "Total do Usuario: " + sespaco + usrtotal;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotusr, 1));
+
+
+
+                }
+
+
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 2));
+                String stotal = String.format("%.2f", vlrtot);
+                stotal = stotal.replace(".", ",");
+
+
+                String sespaco = "";
+                String sqtd = "Bilhetes Vendidos: " + iqtdbil;
+                Integer iqtd = sqtd.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String sbilvend = "Bilhetes Vendidos: " + sespaco + iqtdbil;
+                commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilvend, 1));
+
+
+
+                sespaco = "";
+                String svalor = "Valor Total: " + stotal;
+                iqtd = svalor.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String stotger = "Valor Total: " + sespaco + stotal;
+                commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotger, 2));
+
+
+                String spvenda = dbemp.Busca_Dados_Emp(1, "Pvenda");
+                if (spvenda.equals("R") || (totalemb > 0)) { //rodiviaria calcular taxa de embarque
+                    //vlremb=Double.valueOf(dbemp.Busca_Dados_Emp(1, "Rsv001")).doubleValue();
+                    //totalemb = iqtdbil*vlremb;
+                    String staxa = String.format("%.2f", totalemb);
+                    staxa = staxa.replace(".", ",");
+                    sespaco = "";
+                    String svlrtax = "Taxa de Embarque: " + staxa;
+                    iqtd = svlrtax.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String staxemb = "Taxa de Embarque: " + sespaco + staxa;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", staxemb, 2));
+
+
+                    ///Taxa de embarque por forma de pagamento
+                    if (vlrembd > 0 || vlrembo > 0) {
+                        if (vlrembd > 0) {//Dinheiro
+                            String staxad = String.format("%.2f", vlrembd);
+                            staxa = staxad.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxd = "TX em Dinheiro: " + staxad;
+                            iqtd = svlrtaxd.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembd = "TX em Dinheiro: " + sespaco + staxad;
+                            commands.add(new PrintfManager.PrintCommand("R", "N", "N", staxembd, 2));
+                        }
+                        if (vlrembo > 0) { //Vale transp ou Pix
+                            String staxao = String.format("%.2f", vlrembo);
+                            staxa = staxao.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxo = "TX em Vale Transp: " + staxao;
+                            iqtd = svlrtaxo.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembo = "TX em Vale Transp: " + sespaco + staxao;
+                            commands.add(new PrintfManager.PrintCommand("R", "N", "N", staxembo, 2));
+
+                        }
+                    }
+
+                    totliq = vlrtot - totalemb;
+                    String stotliq = String.format("%.2f", totliq);
+                    stotliq = stotliq.replace(".", ",");
+                    sespaco = "";
+                    String stotalliq = "Tarifa + Seguro: " + stotliq;
+                    iqtd = stotalliq.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String staxseg = "Tarifa + Seguro: " + sespaco + stotliq;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", staxseg, 2));
+
+                }
+                //RESUMO POR FORMA DE PAGAMENTO
+                if (vlrvale > 0) {
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", "", 2));
+                    String stotvale = String.format("%.2f", vlrvale);
+                    stotvale = stotvale.replace(".", ",");
+                    sespaco = "";
+                    String stotalvale = "Vale Transporte: " + stotvale;
+                    iqtd = stotalvale.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    stotalvale = "Vale Transporte: " + sespaco + stotvale;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotalvale, 1));
+                    if (vlrtot > vlrvale) {
+                        double vlrdin = (vlrtot - vlrvale);
+                        String stotdin = String.format("%.2f", vlrdin);
+                        stotdin = stotdin.replace(".", ",");
+                        sespaco = "";
+                        String stotaldin = "Dinheiro: " + stotdin;
+                        iqtd = stotaldin.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        stotaldin = "Dinheiro: " + sespaco + stotdin;
+                        commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotaldin, 2));;
+
+                    }
+
+                }
+
+
+                if (iqtdcan > 0) { //mostrar quantidade cancelada
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", "", 2));
+
+                    String sespacocan = "";
+                    String sqtdcan = "Bilhetes Cancelados: " + iqtdcan;
+                    Integer iqtdc = sqtdcan.length();
+                    if (iqtdc < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdc);
+                        while (sespacocan.length() < iresto) {
+                            sespacocan = " " + sespacocan;
+                        }
+                    }
+                    String sbilcan = "Bilhetes Cancelados: " + sespacocan + iqtdcan;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilcan, 2));
+
+
+                }
+
+                if (iqtddig > 0) {
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", "", 2));
+                    String stotdig = String.format("%.2f", vlrdig);
+                    stotdig = stotdig.replace(".", ",");
+
+
+                    String sespacod = "";
+                    String sqtdd = "Bilhetes em Aberto: " + iqtddig;
+                    Integer iqtdd = sqtdd.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacod.length() < iresto) {
+                            sespacod = " " + sespacod;
+                        }
+                    }
+                    String sbilabe = "Bilhetes em Aberto: " + sespacod + iqtddig;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilabe, 1));
+
+                    sespacod = "";
+                    String svalord = "Valor em Aberto: " + stotdig;
+                    iqtdd = svalord.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacod.length() < iresto) {
+                            sespacod = " " + sespacod;
+                        }
+                    }
+                    String svalabe = "Valor em Aberto: " + sespacod + stotdig;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", svalabe, 2));
+
+                }
+
+                if (iqtdpen > 0) { //existe pendentes
+                    String sespacop = "";
+                    String sqtdp = "Pendentes de Transmissão: " + iqtdpen;
+                    Integer iqtdp = sqtdp.length();
+                    if (iqtdp < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdp);
+                        while (sespacop.length() < iresto) {
+                            sespacop = " " + sespacop;
+                        }
+                    }
+                    String sbilpen = "Bilhetes Pendentes: " + sespacop + iqtdpen;
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilpen, 2));
+
+                }
+
+                if (sespacos.equals("xx")) {
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", "", 2));
+                } else {
+                    int iesp = Integer.parseInt(sespacos);
+                    commands.add(new PrintfManager.PrintCommand("R", "N", "N", "", iesp));
+                }
+
+                printfManager.printBufferedText(commands);
+            } catch (Exception e) {
+                    Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+
+
+            }
+
+    }
+
     @SuppressLint("MissingPermission")
     public void Listar_Vendas_Agrupado_BT() {
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter.isEnabled()) { //Bluetooth esta ativo
             try {
 
                 if (printerBluetooth == null)
@@ -2165,7 +2927,7 @@ public class ConsultaActivity extends AppCompatActivity {
                     String sdia, smes, sano, sdatemi, svlremb;
                     String sviagem = "";
                     String snomeuser = "";
-                    double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, nvlrpas, nvalor, nvalvale, vlrvale, vlrsubvale, vlrembd, vlrembo;
+                    double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, nvlrpas, nvalor, nvalvale, vlrvale, vlrsubvale, vlrembd, vlrembo, vlrembp, vlrpix, vlrsubpix, nvalpix;
                     vlrtot = 0;
                     vlrsub = 0;
                     vlrusr = 0;
@@ -2175,10 +2937,14 @@ public class ConsultaActivity extends AppCompatActivity {
                     vlremb = 0;
                     vlrembd = 0;
                     vlrembo = 0;
+                    vlrembp = 0;
                     totliq = 0;
                     vlrvale = 0;
                     nvalvale = 0;
+                    nvalpix = 0;
+                    vlrpix = 0;
                     vlrsubvale = 0;
+                    vlrsubpix = 0;
                     Integer iqtdbil = 0;
                     Integer iqtdsub = 0;
                     Integer iqtdusr = 0;
@@ -2273,46 +3039,31 @@ public class ConsultaActivity extends AppCompatActivity {
                                     if (stippag.equals("05")) {
                                         //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlremb);
                                         String svale = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrvale");
-                                        svale = svale.replace(",", ".");
+                                        svale = svale.replace(",", "."); // ADICIONAR ESTA LINHA
                                         nvalvale = Double.valueOf(svale).doubleValue();
                                         String stotvale = String.format("%.2f", (nvalvale + nvlrpas));
                                         RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrvale", stotvale);
                                         if (vlremb > 0) {//vale transporte
                                             vlrembo = vlrembo + vlremb;
-                                                /*svlremb = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrembo");
-                                                svlremb = svlremb.replace(",", ".");
-                                                String svalembo = "";
-                                                if (!svlremb.equals("")) {
-                                                    vlrembo = Double.valueOf(svlremb).doubleValue();
-                                                    svalembo = String.format("%.2f", (vlrembo + vlremb));
-                                                    vlrembo = vlrembo + vlremb;
-                                                } else {
-                                                    svalembo = String.format("%.2f", (vlremb));
-                                                    vlrembo = vlremb;
-                                                }
-                                                RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrembo", svalembo);
-                                                Log.i(TAG," Inserir Pagamento O: "+stippag+" = " + vlrembd + " === "+ svalembo);
-                                                */
+
+                                        }
+
+                                    }   else if (stippag.equals("06")) {//Pix
+                                        String svalpix = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrpix");
+                                        svalpix = svalpix.replace(",", "."); // ADICIONAR ESTA LINHA
+                                        nvalpix = Double.valueOf(svalpix).doubleValue();
+                                        String stotpix = String.format("%.2f", (nvalpix + nvlrpas));
+                                        RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrpix", stotpix);
+                                        if (vlremb > 0) {//vale transporte
+                                            vlrembp = vlrembp + vlremb;
+
                                         }
 
                                     } else {//dinheiro
                                         //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlremb);
                                         if (vlremb > 0) {
                                             vlrembd = vlrembd + vlremb;
-                                                /*svlremb = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrembd");
-                                                svlremb = svlremb.replace(",", ".");
-                                                String svalembd = "";
-                                                if (!svlremb.equals("")) {
-                                                    vlrembd = Double.valueOf(svlremb).doubleValue();
-                                                    svalembd = String.format("%.2f", (vlrembd + vlremb));
-                                                    vlrembd = vlrembd + vlremb;
-                                                }  else {
-                                                    svalembd = String.format("%.2f", (vlremb));
-                                                    vlrembd = vlremb;
-                                                }
-                                                RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrembd", svalembd);
-                                                Log.i(TAG," Atualizar Pagamento D: "+stippag+" = " + svalembd + " === "+ vlrembo);
-                                                */
+
                                         }
                                     }
 
@@ -2328,11 +3079,21 @@ public class ConsultaActivity extends AppCompatActivity {
                                     totalemb = totalemb + vlremb;
                                     //Criar Vale transporte
                                     Double nvale = 0.00;
-                                    if (stippag.equals("05")) {
-                                        nvale = nvlrpas;
-                                        if (vlremb > 0) {//vale transporte
-                                            vlrembo = vlrembo + vlremb;
-                                            //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembo);
+                                    Double npix = 0.00;
+                                    if (stippag.equals("05") || stippag.equals("06")) {
+                                        if (stippag.equals("05")) {
+                                            nvale = nvlrpas;
+                                            if (vlremb > 0) {//vale transporte
+                                                vlrembo = vlrembo + vlremb;
+                                                //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembo);
+                                            }
+                                        }
+                                        if (stippag.equals("06")) {//Pix
+                                            npix = nvlrpas;
+                                            if (vlremb > 0) {//Pix
+                                                vlrembp = vlrembp + vlremb;
+                                                //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembo);
+                                            }
                                         }
                                     } else {
                                         if (vlremb > 0) {//vale transporte
@@ -2341,7 +3102,7 @@ public class ConsultaActivity extends AppCompatActivity {
                                         }
                                     }
                                     //Log.i(TAG," Inserir Pagamento: "+stippag+" = " + vlrembd + " === "+ vlrembo);
-                                    RELTMP.InserirTmp(scodigo, svia, susr, semissao, "1", String.format("%.2f", (nvlrpas)), String.format("%.2f", (nvale)), String.format("%.2f", (vlrembd)), String.format("%.2f", (vlrembo)));
+                                    RELTMP.InserirTmp(scodigo, svia, susr, semissao, "1", String.format("%.2f", (nvlrpas)), String.format("%.2f", (nvale)), String.format("%.2f", (vlrembd)), String.format("%.2f", (vlrembo)), String.format("%.2f", (npix)), String.format("%.2f", (vlrembp)));
                                 }
 
 
@@ -2406,6 +3167,7 @@ public class ConsultaActivity extends AppCompatActivity {
                         String sDatatu = cursortmp.getDatemi();
                         String suser = cursortmp.getAgente();
                         String svalvale = cursortmp.getVlrvale();
+                        String svalpix = cursortmp.getVlrpix();
 
                         //procurar taxa de embarque por forma de pagamento
                             /*String svlrembo = cursortmp.getVlrembo();
@@ -2531,6 +3293,10 @@ public class ConsultaActivity extends AppCompatActivity {
                         svalvale = svalvale.replace(",", ".");
                         vlrsubvale = Double.valueOf(svalvale).doubleValue();
                         vlrvale = vlrvale + vlrsubvale;
+
+                        svalpix = svalpix.replace(",", ".");
+                        vlrsubpix = Double.valueOf(svalpix).doubleValue();
+                        vlrpix = vlrpix + vlrsubpix;
 
 
                         int posV = svia.indexOf("-");
@@ -2698,9 +3464,10 @@ public class ConsultaActivity extends AppCompatActivity {
                         out.write(EscPosBase.nextLine(2));
 
                         ///Taxa de embarque por forma de pagamento
-                        if (vlrembd > 0 || vlrembo > 0) {
+                        if (vlrembd > 0 || vlrembo > 0 || vlrembp >0) {
                             Log.i(TAG, "Taxa de embarque: " + vlrembd + vlrembo);
                             if (vlrembd > 0) {//Dinheiro
+                                out.write(EscPosBase.nextLine(1));
                                 String staxad = String.format("%.2f", vlrembd);
                                 staxad = staxad.replace(".", ",");
                                 sespaco = "";
@@ -2718,9 +3485,10 @@ public class ConsultaActivity extends AppCompatActivity {
                             }
                             if (vlrembo > 0) { //Vale transp ou Pix
                                 String staxao = String.format("%.2f", vlrembo);
+                                out.write(EscPosBase.nextLine(1));
                                 staxao = staxao.replace(".", ",");
                                 sespaco = "";
-                                String svlrtaxo = "TX em Vale Transp: " + staxao;
+                                String svlrtaxo = "TX em Pagamento Digital: " + staxao;
                                 iqtd = svlrtaxo.length();
                                 if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
                                     Integer iresto = (32 - iqtd);
@@ -2728,7 +3496,25 @@ public class ConsultaActivity extends AppCompatActivity {
                                         sespaco = " " + sespaco;
                                     }
                                 }
-                                String staxembo = "TX em Vale Transp: " + sespaco + staxao;
+                                String staxembo = "TX em Pagamento Digital: " + sespaco + staxao;
+                                out.write(staxembo.getBytes(StandardCharsets.UTF_8));
+                                out.write(EscPosBase.nextLine(1));
+
+                            }
+                            if (vlrembp > 0) { //Vale transp ou Pix
+                                out.write(EscPosBase.nextLine(1));
+                                String staxao = String.format("%.2f", vlrembp);
+                                staxao = staxao.replace(".", ",");
+                                sespaco = "";
+                                String svlrtaxo = "TX paga em PIX: " + staxao;
+                                iqtd = svlrtaxo.length();
+                                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                    Integer iresto = (32 - iqtd);
+                                    while (sespaco.length() < iresto) {
+                                        sespaco = " " + sespaco;
+                                    }
+                                }
+                                String staxembo = "TX paga em PIX: " + sespaco + staxao;
                                 out.write(staxembo.getBytes(StandardCharsets.UTF_8));
                                 out.write(EscPosBase.nextLine(1));
 
@@ -2756,24 +3542,43 @@ public class ConsultaActivity extends AppCompatActivity {
                     }
 
                     //RESUMO POR FORMA DE PAGAMENTO
-                    if (vlrvale > 0) {
+                    if (vlrvale > 0 || vlrpix > 0) {
                         out.write(EscPosBase.nextLine(2));
-                        String stotvale = String.format("%.2f", vlrvale);
-                        stotvale = stotvale.replace(".", ",");
-                        sespaco = "";
-                        String stotalvale = "Vale Transporte: " + stotvale;
-                        iqtd = stotalvale.length();
-                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
-                            Integer iresto = (32 - iqtd);
-                            while (sespaco.length() < iresto) {
-                                sespaco = " " + sespaco;
+                        if (vlrvale > 0) {
+                            String stotvale = String.format("%.2f", vlrvale);
+                            stotvale = stotvale.replace(".", ",");
+                            sespaco = "";
+                            String stotalvale = "Vale Transporte: " + stotvale;
+                            iqtd = stotalvale.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
                             }
+                            stotalvale = "Vale Transporte: " + sespaco + stotvale;
+                            out.write(stotalvale.getBytes(StandardCharsets.UTF_8));
+                            out.write(EscPosBase.nextLine());
                         }
-                        stotalvale = "Vale Transporte: " + sespaco + stotvale;
-                        out.write(stotalvale.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine());
-                        if (vlrtot > vlrvale) {
-                            double vlrdin = (vlrtot - vlrvale);
+                        if (vlrpix > 0) {
+                            String stotpix = String.format("%.2f", vlrpix);
+                            stotpix = stotpix.replace(".", ",");
+                            sespaco = "";
+                            String stotalpix = "PIX: " + stotpix;
+                            iqtd = stotalpix.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            stotalpix = "PIX: " + sespaco + stotpix;
+                            System.out.println("stotalpix: "+stotalpix );
+                            out.write(stotalpix.getBytes(StandardCharsets.UTF_8));
+                            out.write(EscPosBase.nextLine());
+                        }
+                        if (vlrtot > (vlrvale+vlrpix)) {
+                            double vlrdin = (vlrtot - (vlrvale+vlrpix));
                             String stotdin = String.format("%.2f", vlrdin);
                             stotdin = stotdin.replace(".", ",");
                             sespaco = "";
@@ -2880,15 +3685,741 @@ public class ConsultaActivity extends AppCompatActivity {
                 }
             } catch (Exception e) {
                 Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+                System.out.println("Erro ao Imprimir: "+e.getMessage() );
+
             }
-        } else {
-            Toast.makeText(this, "Bluetooth está Desativado\n\n" + "Ative antes de Prosseguir", Toast.LENGTH_LONG).show();
-        }
 
 
     }
 
+//AR-2500
+@SuppressLint("MissingPermission")
+public void Listar_Vendas_Agrupado_DTS() {
+    if (printfManager == null) {
+        Intent myIntent = new Intent(ConsultaActivity.this, PrintfBlueListActivity.class);
+        Bundle bundle = new Bundle();
+        bundle.putString("USUARIO", Nome_user);
+        myIntent.putExtras(bundle);
+        resultadoImpressora.launch(myIntent);
+    }
+        try {
+            List<PrintfManager.PrintCommand> commands = new ArrayList<>();
+                String sdia, smes, sano, sdatemi, svlremb;
+                String sviagem = "";
+                String snomeuser = "";
+                double vlrtot, vlrbil, vlrsub, vlrusr, vlrdig, vlrdia, vlremb, totalemb, totliq, nvlrpas, nvalor, nvalvale, vlrvale, vlrsubvale, vlrembd, vlrembo, vlrpix, totpix, vlrsubpix, nvalpix, vlrembp;
+                vlrtot = 0;
+                vlrsub = 0;
+                vlrusr = 0;
+                vlrdig = 0;
+                vlrdia = 0;
+                totalemb = 0;
+                vlremb = 0;
+                vlrembd = 0;
+                vlrembo = 0;
+                vlrembp = 0;
+                totliq = 0;
+                vlrvale = 0;
+                nvalvale = 0;
+                vlrsubvale = 0;
+                vlrpix = 0;
+                totpix = 0;
+                vlrsubpix = 0;
+                nvalpix = 0;
+                Integer iqtdbil = 0;
+                Integer iqtdsub = 0;
+                Integer iqtdusr = 0;
+                Integer iqtdcan = 0;
+                Integer iqtddig = 0;
+                Integer iqtdpen = 0;
+                Integer iqtddia = 0;
+                String sDatcaixa = "";
 
+                //Limpar Base temporaria
+                DB_TMP RELTMP = new DB_TMP(ConsultaActivity.this);
+                RELTMP.deletar_TMP();
+
+                //Dados a Empresa
+                DB_EMP dbemp = new DB_EMP(getApplicationContext());
+
+                CheckBox cklist = findViewById(R.id.ckbListar);
+                CheckBox ckfecha = findViewById(R.id.ckbFectur);
+                CheckBox ckbger = findViewById(R.id.ckbGeral);
+                String sgeral = "";
+                if (ckbger.isChecked()) {
+                    sgeral = "S";
+                }
+
+                DB_BPE db = new DB_BPE(ConsultaActivity.this);
+                DB_BPE.BpeCursor cursor = db.RetornarBpe(DB_BPE.BpeCursor.OrdenarPor.NomeCrescente);
+
+                for (int ibp = 0; ibp < cursor.getCount(); ibp++) {
+                    cursor.moveToPosition(ibp);
+                    String sdatven = cursor.getDatemi();
+                    String sdatsai = sdatven.substring(0, (10));
+                    String sagente = cursor.getAgente();
+                    String sfecha = cursor.getTippas();
+                    String stransf = cursor.getTransf();
+                    if (!stransf.equals("S")) {
+                        iqtdpen = iqtdpen + 1;
+                    }
+                    if (!sfecha.equals("S") || sgeral.equals("S")) { //se ainda nao fechou turno ou se for conferencia geral
+                        String sSitbpe = cursor.getSitbpe();
+
+                        String scancel = cursor.getRsv001(); //se marcou para cancelar
+                        if ((sSitbpe.equals("BA") && !scancel.equals("S")) || (sSitbpe.equals("CT") && !scancel.equals("S"))) { //Autorizados e contingencia
+                            String susr = cursor.getAgente();
+                            String sdat = cursor.getDatemi();
+                            String semissao = sdat.substring(0, 10);
+                            String svia = cursor.getNomvia();
+                            String vlrpas = cursor.getVlrpas();
+                            String stippag = cursor.getPagmto();
+                            vlrpas = vlrpas.replace(",", ".");
+                            nvlrpas = Double.valueOf(vlrpas).doubleValue();
+                            String scodigo = susr + semissao + svia;
+                            DB_TMP.TmpCursor cursortmp = RELTMP.RetornarTmp(DB_TMP.TmpCursor.OrdenarPor.NomeCrescente);
+                            String sOK = "";
+                            for (int itmp = 0; itmp < cursortmp.getCount(); itmp++) {
+                                cursortmp.moveToPosition(itmp);
+
+                            }
+                            if (cursortmp.getCount() > 0) {
+                                sOK = "S";
+                            }
+
+
+                            String svai = "";
+                            if (sOK.equals("S")) {
+                                for (int itmp = 0; itmp < cursortmp.getCount(); itmp++) {
+                                    cursortmp.moveToPosition(itmp);
+                                    String scodtmp = cursortmp.getCodigo();
+                                    if (scodigo.equals(scodtmp)) {
+                                        svai = "S";
+
+                                    }
+                                }
+                            }
+
+                            if (svai.equals("S")) { //Achei combinacao de usuario,data,viagem
+                                String sval = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrtot");
+                                String sqtd = RELTMP.Busca_Dados_Tmp(scodigo, "Qqtbil");
+                                sval = sval.replace(",", ".");
+                                nvalor = Double.valueOf(sval).doubleValue();
+
+                                String stot = String.format("%.2f", (nvalor + nvlrpas));
+                                String idTMP = RELTMP.Busca_Dados_Tmp(scodigo, "ID");
+                                RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrtot", stot);
+
+                                vlremb = Double.valueOf(cursor.getVlremb()).doubleValue();
+                                totalemb = totalemb + vlremb;
+                                //Atualizar Vale transporte
+                                //Log.i(TAG,"Taxa de embarque Encontrei DB: ");
+                                if (stippag.equals("05")) {
+                                    //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlremb);
+                                    String svale = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrvale");
+                                    svale = svale.replace(",", ".");
+                                    nvalvale = Double.valueOf(svale).doubleValue();
+                                    String stotvale = String.format("%.2f", (nvalvale + nvlrpas));
+                                    RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrvale", stotvale);
+                                    if (vlremb > 0) {//vale transporte
+                                        vlrembo = vlrembo + vlremb;
+
+                                    }
+
+                                }
+                                else if (stippag.equals("06")) { //PIX
+                                    vlrembd = vlrembd + vlremb;
+                                    String svalpix = RELTMP.Busca_Dados_Tmp(scodigo, "Vlrpix");
+                                    svalpix = svalpix.replace(",", ".");
+                                    nvalpix = Double.valueOf(svalpix).doubleValue();
+                                    String stotpix = String.format("%.2f", (nvalpix + nvlrpas));
+                                    RELTMP.Atualizar_Campo_Tmp(idTMP, "Vlrpix", stotpix);
+                                    if (vlremb > 0) {//Pix
+                                        vlrembp= vlrembp + vlremb;
+
+                                    }
+                                } else {//dinheiro
+                                    //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlremb);
+                                    if (vlremb > 0) {
+                                        vlrembd = vlrembd + vlremb;
+                                    }
+                                }
+
+
+                                int iqtd = Integer.parseInt(sqtd);
+                                iqtd = (iqtd + 1);
+                                RELTMP.Atualizar_Campo_Tmp(idTMP, "Qqtbil", Integer.toString(iqtd));
+
+
+                            } else {
+                                //Log.i(TAG,"Taxa de embarque Nao Encontrei DB: ");
+                                vlremb = Double.valueOf(cursor.getVlremb()).doubleValue();
+                                totalemb = totalemb + vlremb;
+                                //Criar Vale transporte
+                                Double nvale = 0.00;
+                                Double npix = 0.00;
+                                if (stippag.equals("05") || stippag.equals("06")) {
+                                    if (stippag.equals("05")) {
+                                        nvale = nvlrpas;
+                                        if (vlremb > 0) {//vale transporte
+                                            vlrembo = vlrembo + vlremb;
+                                            //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembo);
+                                        }
+                                    }
+                                    if (stippag.equals("06")) {//Pix
+                                        npix = nvlrpas;
+                                        if (vlremb > 0) {//vale transporte
+                                            vlrembp = vlrembp + vlremb;
+                                            //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembo);
+                                        }
+                                    }
+                                } else {
+                                    if (vlremb > 0) {//vale transporte
+                                        vlrembd = vlrembd + vlremb;
+                                        //Log.i(TAG,sdat+" Forma: "+stippag+" = " + vlrembd);
+                                    }
+                                }
+                                //Log.i(TAG," Inserir Pagamento: "+stippag+" = " + vlrembd + " === "+ vlrembo);
+                                RELTMP.InserirTmp(scodigo, svia, susr, semissao, "1", String.format("%.2f", (nvlrpas)), String.format("%.2f", (nvale)), String.format("%.2f", (vlrembd)), String.format("%.2f", (vlrembo)), String.format("%.2f", (npix)), String.format("%.2f", (vlrembp)));
+                            }
+
+
+                        } else if (sSitbpe.equals("CA")) {
+                            iqtdcan = iqtdcan + 1;
+                        } else if (sSitbpe.equals("DG")) {
+                            iqtddig = iqtddig + 1;
+                            String sval = cursor.getVlrpas();
+                            vlrbil = Double.valueOf(sval).doubleValue();
+                            vlrdig = vlrdig + vlrbil;
+
+                        }
+
+                        if (sSitbpe.equals("CT") && scancel.equals("S")) {
+                            iqtdcan = iqtdcan + 1;
+                        }
+
+                        if (sSitbpe.equals("BA") && scancel.equals("S")) {
+                            iqtdcan = iqtdcan + 1;
+                        }
+
+                        if (ckfecha.isChecked()) { ///marcar como fechado
+                            String snum = cursor.getNumbpe();
+                            String sid = db.Busca_Dados_Bpe(snum, "ID");
+                            db.Atualizar_Campo_Bpe(sid, "Tippas", "S");
+
+                        }
+                    }
+                }
+
+                ////Comeca imprimir aqui
+                String sespacos = dbemp.Busca_Dados_Emp(1, "Rsv003");
+
+
+                String sdathor = Funcoes_Android.getCurrentUTC();
+                sano = sdathor.substring(0, (4));
+                smes = sdathor.substring(5, (7));
+                sdia = sdathor.substring(8, (10));
+                sdatemi = sdia + "/" + smes + "/" + sano;
+                EditText edtuser = findViewById(R.id.edtUsrvenda);
+                String susuario = edtuser.getText().toString();
+
+
+                String sdatimp = "Data de Impressao: " + sdatemi;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", sdatimp, 2));
+
+                DB_TMP.TmpCursor cursortmp = RELTMP.RetornarTmp(DB_TMP.TmpCursor.OrdenarPor.NomeCrescente);
+                String sUltdat = "";
+                for (int i = 0; i < cursortmp.getCount(); i++) {
+                    cursortmp.moveToPosition(i);
+                    String svia = cursortmp.getDescri();
+                    String sqtdbil = cursortmp.getQtdbil();
+                    String svaltot = cursortmp.getVlrtot();
+                    String sDatatu = cursortmp.getDatemi();
+                    String suser = cursortmp.getAgente();
+                    String svalvale = cursortmp.getVlrvale();
+                    String svalpix = cursortmp.getVlrpix();
+
+
+
+                    if (!sDatatu.equals(sUltdat) && !sUltdat.equals("")) {
+                        String subtot = String.format("%.2f", vlrdia);
+                        subtot = subtot.replace(".", ",");
+
+
+                        String sespaco = "";
+                        String sqtd = "Bilhetes da Data: " + iqtddia;
+                        Integer iqtd = sqtd.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        String sbildat = "Bilhetes da Data: " + sespaco + iqtddia;
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbildat, 1));
+
+                        sespaco = "";
+                        String svalor = "Total da Data: " + subtot;
+                        iqtd = svalor.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        String stotdat = "Total da Data: " + sespaco + subtot;
+                        commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotdat, 2));
+
+                        iqtddia = 0;
+                        vlrdia = 0;
+                    }
+
+
+                    if (!suser.equals(snomeuser)) {
+                        if (iqtdusr > 0) { //subtotal do Usuario
+
+                            String usrtotal = String.format("%.2f", vlrusr);
+                            usrtotal = usrtotal.replace(".", ",");
+
+
+                            String sespaco = "";
+                            String sqtd = "Bilhetes do Usuario: " + iqtdusr;
+                            Integer iqtd = sqtd.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String sbilusr = "Bilhetes do Usuario: " + sespaco + iqtdusr;
+                            commands.add(new PrintfManager.PrintCommand("R", "N", "N", sbilusr, 1));
+
+
+
+                            sespaco = "";
+                            String svalor = "Total do Usuario: " + usrtotal;
+                            iqtd = svalor.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String stotusr = "Total do Usuario: " + sespaco + usrtotal;
+                            commands.add(new PrintfManager.PrintCommand("R", "N", "N", stotusr, 1));;
+
+
+                            vlrusr = 0;
+                            iqtdusr = 0;
+                        }
+
+                        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 1));
+                        String snomeusr = "USUARIO: " + suser;
+                        commands.add(new PrintfManager.PrintCommand("R", "N", "N", snomeusr, 1));
+                    }
+
+
+                    if (!sDatatu.equals(sUltdat)) {
+                        String sdiav, smesv, sanov, sdatav;
+                        sanov = sDatatu.substring(0, 4);
+                        smesv = sDatatu.substring(5, 7);
+                        sdiav = sDatatu.substring(8, 10);
+                        sdatav = sdiav + "/" + smesv + "/" + sanov;
+
+
+                        String sdatven = "Data da Venda: " + sdatav;
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", sdatven, 2));
+
+                    }
+
+
+                    sUltdat = sDatatu;
+                    snomeuser = suser;
+                    svaltot = svaltot.replace(",", ".");
+                    vlrsub = Double.valueOf(svaltot).doubleValue();
+                    int iqtd = Integer.parseInt(sqtdbil);
+                    iqtddia = iqtddia + iqtd;
+                    iqtdbil = iqtdbil + iqtd;
+                    iqtdusr = iqtdusr + iqtd;
+                    vlrdia = vlrdia + vlrsub;
+                    vlrtot = vlrtot + vlrsub;
+                    vlrusr = vlrusr + vlrsub;
+                    svalvale = svalvale.replace(",", ".");
+                    vlrsubvale = Double.valueOf(svalvale).doubleValue();
+                    vlrvale = vlrvale + vlrsubvale;
+                    svalpix = svalpix.replace(",", ".");
+                    vlrsubpix = Double.valueOf(svalpix).doubleValue();
+                    vlrpix = vlrpix + vlrsubpix;
+
+
+                    int posV = svia.indexOf("-");
+                    Integer iqtdvia = svia.length();
+                    svia = svia.substring((posV + 1), (iqtdvia));
+
+                    String sespacov = "";
+                    Integer iqtdd = svia.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacov.length() < iresto) {
+                            sespacov = " " + sespacov;
+                        }
+                    }
+                    String snomevia = svia + sespacov;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", snomevia, 1));
+
+
+                    sespacov = "";
+                    String sqtdd = "Bilhetes da Viagem: " + sqtdbil;
+                    iqtdd = sqtdd.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacov.length() < iresto) {
+                            sespacov = " " + sespacov;
+                        }
+                    }
+                    String sbilvia = "Bilhetes da Viagem" + sespacov + sqtdbil;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilvia, 1));
+
+                    sespacov = "";
+                    sqtdd = "Total da Viagem: " + svaltot;
+                    iqtdd = sqtdd.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacov.length() < iresto) {
+                            sespacov = " " + sespacov;
+                        }
+                    }
+                    String stotvia = "Total da Viagem" + sespacov + svaltot;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotvia, 1));
+
+
+                }
+
+                String subtot = String.format("%.2f", vlrdia);
+                subtot = subtot.replace(".", ",");
+
+
+                String sespaco = "";
+                String sqtd = "Bilhetes da Data: " + iqtddia;
+                Integer iqtd = sqtd.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String sbildat = "Bilhetes da Data: " + sespaco + iqtddia;
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbildat, 1));
+
+                sespaco = "";
+                String svalor = "Total da Data: " + subtot;
+                iqtd = svalor.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String stotdat = "Total da Data: " + sespaco + subtot;
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotdat, 2));
+
+
+                iqtddia = 0;
+                vlrdia = 0;
+
+
+                if (iqtdusr > 0) { //subtotal do Usuario
+                    String usrtotal = String.format("%.2f", vlrusr);
+                    usrtotal = usrtotal.replace(".", ",");
+
+
+                    sespaco = "";
+                    sqtd = "Bilhetes do Usuario: " + iqtdusr;
+                    iqtd = sqtd.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String sbilusr = "Bilhetes do Usuario: " + sespaco + iqtdusr;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilusr, 1));
+
+
+                    sespaco = "";
+                    svalor = "Total do Usuario: " + usrtotal;
+                    iqtd = svalor.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String stotusr = "Total do Usuario: " + sespaco + usrtotal;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotusr, 1));
+
+
+
+                }
+
+
+                String stotal = String.format("%.2f", vlrtot);
+                stotal = stotal.replace(".", ",");
+
+
+                sespaco = "";
+                sqtd = "Bilhetes Vendidos: " + iqtdbil;
+                iqtd = sqtd.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String sbilven = "Bilhetes Vendidos: " + sespaco + iqtdbil;
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilven, 1));
+
+
+                sespaco = "";
+                svalor = "Valor Total: " + stotal;
+                iqtd = svalor.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                String svaltot = "Valor Total: " + sespaco + stotal;
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", svaltot, 1));
+
+
+                String spvenda = dbemp.Busca_Dados_Emp(1, "Pvenda");
+                if (totalemb > 0) { //rodiviaria calcular taxa de embarque
+                    //vlremb=Double.valueOf(dbemp.Busca_Dados_Emp(1, "Rsv001")).doubleValue();
+                    //totalemb = iqtdbil*vlremb;
+                    String staxa = String.format("%.2f", totalemb);
+                    staxa = staxa.replace(".", ",");
+                    sespaco = "";
+                    String svlrtax = "Taxa de Embarque: " + staxa;
+                    iqtd = svlrtax.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String staxemb = "Taxa de Embarque: " + sespaco + staxa;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", staxemb, 1));
+
+                    ///Taxa de embarque por forma de pagamento
+                    if (vlrembd > 0 || vlrembo > 0 || vlrembp > 0) {
+                        Log.i(TAG, "Taxa de embarque: " + vlrembd + vlrembo + vlrembp);
+                        if (vlrembd > 0) {//Dinheiro
+                            String staxad = String.format("%.2f", vlrembd);
+                            staxad = staxad.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxd = "TX em Dinheiro: " + staxad;
+                            iqtd = svlrtaxd.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembd = "TX em Dinheiro: " + sespaco + staxad;
+                            commands.add(new PrintfManager.PrintCommand("L", "N", "N", staxembd, 1));
+                        }
+                        if (vlrembo > 0) { //Vale transp ou Pix
+                            String staxao = String.format("%.2f", vlrembo);
+                            staxao = staxao.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxo = "TX em Pagmento Digital: " + staxao;
+                            iqtd = svlrtaxo.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembo = "TX em Pagmento Digital: " + sespaco + staxao;
+                            commands.add(new PrintfManager.PrintCommand("L", "N", "N", staxembo, 1));
+
+                        }
+                        if (vlrembp > 0) { //Vale transp ou Pix
+                            String staxap = String.format("%.2f", vlrembp);
+                            staxap = staxap.replace(".", ",");
+                            sespaco = "";
+                            String svlrtaxp = "TX em Pix: " + staxap;
+                            iqtd = svlrtaxp.length();
+                            if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                                Integer iresto = (32 - iqtd);
+                                while (sespaco.length() < iresto) {
+                                    sespaco = " " + sespaco;
+                                }
+                            }
+                            String staxembp = "TX em Pix: " + sespaco + staxap;
+                            commands.add(new PrintfManager.PrintCommand("L", "N", "N", staxembp, 1));
+
+                        }
+                    }
+
+
+                    totliq = vlrtot - totalemb;
+                    String stotliq = String.format("%.2f", totliq);
+                    stotliq = stotliq.replace(".", ",");
+                    sespaco = "";
+                    String stotalliq = "Tarifa + Seguro: " + stotliq;
+                    iqtd = stotalliq.length();
+                    if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtd);
+                        while (sespaco.length() < iresto) {
+                            sespaco = " " + sespaco;
+                        }
+                    }
+                    String staxseg = "Tarifa + Seguro: " + sespaco + stotliq;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", staxseg, 1));
+
+
+                }
+
+                //RESUMO POR FORMA DE PAGAMENTO
+                if (vlrvale > 0 || vlrpix > 0) {
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 2));
+                    if (vlrvale > 0) {
+                        String stotvale = String.format("%.2f", vlrvale);
+                        stotvale = stotvale.replace(".", ",");
+                        sespaco = "";
+                        String stotalvale = "Vale Transporte: " + stotvale;
+                        iqtd = stotalvale.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        stotalvale = "Vale Transporte: " + sespaco + stotvale;
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotalvale, 1));
+                    }
+                    if (vlrpix > 0) {
+                        String stotpix = String.format("%.2f", vlrpix);
+                        stotpix = stotpix.replace(".", ",");
+                        sespaco = "";
+                        String stotalpix = "PIX: " + stotpix;
+                        iqtd = stotalpix.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        stotalpix = "PIX: " + sespaco + stotpix;
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotalpix, 1));
+                    }
+                    if (vlrtot > (vlrvale+vlrpix)) {
+                        double vlrdin = (vlrtot - (vlrvale+vlrpix));
+                        String stotdin = String.format("%.2f", vlrdin);
+                        stotdin = stotdin.replace(".", ",");
+                        sespaco = "";
+                        String stotaldin = "Dinheiro: " + stotdin;
+                        iqtd = stotaldin.length();
+                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                            Integer iresto = (32 - iqtd);
+                            while (sespaco.length() < iresto) {
+                                sespaco = " " + sespaco;
+                            }
+                        }
+                        stotaldin = "Dinheiro: " + sespaco + stotdin;
+                        commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotaldin, 2));
+
+
+                    }
+
+                }
+
+
+                if (iqtdcan > 0) { //mostrar quantidade cancelada
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 2));
+
+                    String sespacocan = "";
+                    String sqtdcan = "Bilhetes Cancelados: " + iqtdcan;
+                    Integer iqtdc = sqtdcan.length();
+                    if (iqtdc < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdc);
+                        while (sespacocan.length() < iresto) {
+                            sespacocan = " " + sespacocan;
+                        }
+                    }
+                    String sbilcan = "Bilhetes Cancelados: " + sespacocan + iqtdcan;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilcan, 1));
+
+
+                }
+
+                if (iqtddig > 0) {
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 2));
+                    String stotdig = String.format("%.2f", vlrdig);
+                    stotdig = stotdig.replace(".", ",");
+
+
+                    String sespacod = "";
+                    String sqtdd = "Bilhetes em Aberto: " + iqtddig;
+                    Integer iqtdd = sqtdd.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacod.length() < iresto) {
+                            sespacod = " " + sespacod;
+                        }
+                    }
+                    String sbilabe = "Bilhetes em Aberto: " + sespacod + iqtddig;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", sbilabe, 1));
+
+                    sespacod = "";
+                    String svalord = "Valor em Aberto: " + stotdig;
+                    iqtdd = svalord.length();
+                    if (iqtdd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdd);
+                        while (sespacod.length() < iresto) {
+                            sespacod = " " + sespacod;
+                        }
+                    }
+                    String stotabe = "Valor em Aberto: " + sespacod + stotdig;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotabe, 1));
+
+                }
+
+                if (iqtdpen > 0) { //existe pendentes
+                    String sespacop = "";
+                    String sqtdp = "Pendentes de Transmissão: " + iqtdpen;
+                    Integer iqtdp = sqtdp.length();
+                    if (iqtdp < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                        Integer iresto = (32 - iqtdp);
+                        while (sespacop.length() < iresto) {
+                            sespacop = " " + sespacop;
+                        }
+                    }
+                    String stotpen = "Pendentes de Transmissao: " + sespacop + iqtdpen;
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", stotpen, 1));
+                }
+
+                if (sespacos.equals("xx")) {
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", 4));
+                } else {
+                    int iesp = Integer.parseInt(sespacos);
+                    commands.add(new PrintfManager.PrintCommand("L", "N", "N", "", iesp));
+                }
+
+                printfManager.printBufferedText(commands);
+                //Limpar Base temporaria
+                RELTMP.deletar_TMP();
+
+
+             } catch (Exception e) {
+                Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+             }
+
+
+
+}
 
 
 

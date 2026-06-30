@@ -19,7 +19,7 @@ public class DB_TMP extends SQLiteOpenHelper {
     /**
      * A versão da base de dados que esta classe compreende.
      */
-    private static final int VERSAO_BD = 3;
+    private static final int VERSAO_BD = 5;
     private static final String LOG_TAG = "TMP";
     /**
      * Mantém rastreamento do contexto que nós podemos carregar SQL
@@ -60,6 +60,14 @@ public class DB_TMP extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE TMP ADD COLUMN Vlrembd TEXT DEFAULT ''");
                 db.execSQL("ALTER TABLE TMP ADD COLUMN Vlrembo TEXT DEFAULT ''");
             }
+            if (oldVersion < 4) {
+                db.execSQL("ALTER TABLE TMP ADD COLUMN Vlrpix TEXT DEFAULT ''");
+
+            }
+            if (oldVersion < 5) {
+                db.execSQL("ALTER TABLE TMP ADD COLUMN Vlrembp TEXT DEFAULT ''");
+
+            }
 
         }
     }
@@ -88,7 +96,7 @@ public class DB_TMP extends SQLiteOpenHelper {
         return cc;
     }
 
-    public long InserirTmp(String codigo, String descri, String agente, String datemi, String qtdbil, String vlrtot, String vlrvale, String vlrembd, String vlrembo)
+    public long InserirTmp(String codigo, String descri, String agente, String datemi, String qtdbil, String vlrtot, String vlrvale, String vlrembd, String vlrembo, String vlrpix, String vlrembp)
 
     {
         SQLiteDatabase db = getReadableDatabase();
@@ -104,6 +112,9 @@ public class DB_TMP extends SQLiteOpenHelper {
             initialValues.put("Vlrvale", vlrvale);
             initialValues.put("Vlrembd", vlrembd);
             initialValues.put("Vlrembo", vlrembo);
+            initialValues.put("Vlrpix", vlrpix);
+            initialValues.put("Vlrembp", vlrembp);
+
 
 
             return db.insert("TMP", null, initialValues);
@@ -118,7 +129,7 @@ public class DB_TMP extends SQLiteOpenHelper {
         db.close();
     }
 
-    public void Atualizar_Tmp(String id, String codigo, String descri, String agente, String datemi, String qtdbil, String vlrtot, String vlrvale, String vlrembd, String vlrembo) {
+    public void Atualizar_Tmp(String id, String codigo, String descri, String agente, String datemi, String qtdbil, String vlrtot, String vlrvale, String vlrembd, String vlrembo, String vlrpix, String vlrembp) {
         SQLiteDatabase db = this.getReadableDatabase();
 
         ContentValues valores = new ContentValues();
@@ -133,6 +144,8 @@ public class DB_TMP extends SQLiteOpenHelper {
         valores.put("Vlrvale", vlrvale);
         valores.put("Vlrembd", vlrembd);
         valores.put("Vlrembo", vlrembo);
+        valores.put("Vlrpix", vlrpix);
+        valores.put("Vlrembp", vlrembp);
 
 
         getWritableDatabase().update("TMP", valores, "id=?", argumentos);
@@ -187,6 +200,8 @@ public class DB_TMP extends SQLiteOpenHelper {
         public String getVlrvale() { return getString(getColumnIndexOrThrow("Vlrvale"));}
         public String getVlrembd() { return getString(getColumnIndexOrThrow("Vlrembd"));}
         public String getVlrembo() { return getString(getColumnIndexOrThrow("Vlrembo"));}
+        public String getVlrpix() { return getString(getColumnIndexOrThrow("Vlrpix"));}
+        public String getVlrembp() { return getString(getColumnIndexOrThrow("Vlrembp"));}
 
 
     }

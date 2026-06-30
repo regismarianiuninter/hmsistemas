@@ -7,6 +7,7 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.ComponentName;
 import android.content.Context;
@@ -20,6 +21,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.AnimationDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -58,6 +60,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -204,14 +207,14 @@ public class ViaActivity extends AppCompatActivity {
     public static final int DO_PRINT = 0x10001;
     private IWoyouService woyouService;
     private MobiPixOnboard mobipix;
-    private byte[] inputCommand ;
+    private byte[] inputCommand;
     private final int RUNNABLE_LENGHT = 2;
     private Random random = new Random();
     private boolean isBold, isUnderLine;
     private int record;
     private String[] mStrings = new String[]{"CP437", "CP850", "CP860", "CP863", "CP865", "CP857", "CP737", "Windows-1252", "CP866", "CP852", "CP858", "CP874", "CP855", "CP862", "CP864", "GB18030", "BIG5", "KSC5601", "utf-8"};
     private ICallback callback = null;
-    private  TextView info;
+    private TextView info;
     Bitmap mBitmap;
     private ListView listViewBPe;
     private ListView listMenu;
@@ -269,7 +272,11 @@ public class ViaActivity extends AppCompatActivity {
     private ExecutorService executor = Executors.newSingleThreadExecutor();
     View viewConexao;
 
+    private static final int QR_CODE_SIZE = 200;
+    private static final int MAX_ATTEMPTS = 90;
+    private static final long POLLING_INTERVAL_MS = 1000;
 
+    private boolean isPolling = false;
 
     private HashMap<String, Integer> alignCenter = new HashMap<>();
     private HashMap<String, Integer> alignLeft = new HashMap<>();
@@ -324,9 +331,11 @@ public class ViaActivity extends AppCompatActivity {
     private String sgQRcode = "";
     private String sgtottrib = "";
 
+    private AlertDialog ifpgt = null;
 
-
-
+    private View viewPgt = null;
+    int progress = 0;
+    ProgressBar simpleProgressBar;
 
 
     private ServiceConnection connService = new ServiceConnection() {
@@ -390,7 +399,7 @@ public class ViaActivity extends AppCompatActivity {
         theButton.setOnClickListener(v -> {
             String slinSel = selectedLinha[0];
             if (!slinSel.equals("")) {
-                System.out.println("Estou dentro Select_Linha: "+slinSel);
+                System.out.println("Estou dentro Select_Linha: " + slinSel);
                 Linha_Trab = slinSel;
                 dialog.dismiss();
                 if (callback != null) {
@@ -411,24 +420,24 @@ public class ViaActivity extends AppCompatActivity {
     private long printCount = 0;
 
     @SuppressLint("HandlerLeak")
-    Handler handler=new Handler(){
+    Handler handler = new Handler() {
         @Override
-        public void handleMessage(Message msg){
-            if(msg.what == MSG_TEST){
+        public void handleMessage(Message msg) {
+            if (msg.what == MSG_TEST) {
                 // testAll();
                 long mm = MemInfo.getmem_UNUSED(ViaActivity.this);
-                if( mm < 100){
+                if (mm < 100) {
                     handler.sendEmptyMessageDelayed(MSG_TEST, 20000);
-                }else{
+                } else {
                     handler.sendEmptyMessageDelayed(MSG_TEST, 800);
                 }
-                Log.i(TAG,"testAll: " + printCount + " Memory: " + mm);
+                Log.i(TAG, "testAll: " + printCount + " Memory: " + mm);
             }
         }
     };
 
-    private void test(){
-        ThreadPoolManager.getInstance().executeTask(new Runnable(){
+    private void test() {
+        ThreadPoolManager.getInstance().executeTask(new Runnable() {
 
             @Override
             public void run() {
@@ -441,9 +450,9 @@ public class ViaActivity extends AppCompatActivity {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-            }});
+            }
+        });
     }
-
 
 
     @Override
@@ -476,7 +485,6 @@ public class ViaActivity extends AppCompatActivity {
         edtqtd.setText("1");
 
 
-
         ImageView imageView = findViewById(R.id.animacao);
         imageView.setVisibility(View.INVISIBLE);
 
@@ -490,6 +498,9 @@ public class ViaActivity extends AppCompatActivity {
         ///Ativar Impressora AR-2500
         initData();
 
+        BluetoothManager bm = getSystemService(BluetoothManager.class);
+        bluetoothAdapter = (bm != null) ? bm.getAdapter() : null;
+
         // Verificar permissões Bluetooth (necessário para API 31+)
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -498,7 +509,6 @@ public class ViaActivity extends AppCompatActivity {
                             android.Manifest.permission.BLUETOOTH_SCAN},
                     1);
         }
-
 
 
         Button btnPagamento = findViewById(R.id.btnPagamento);
@@ -512,16 +522,17 @@ public class ViaActivity extends AppCompatActivity {
         }
 
         Button btnpay = findViewById(R.id.btnPay);
+        String usepix = ddemp.Busca_Dados_Emp(1, "Cliidb");
         File fXmlFile = new File(getExternalFilesDir("Download").getAbsolutePath() + "/MOBIPIX.xml");
-        if (fXmlFile.exists()) {
-           btnpay.setEnabled(true);
+        if (fXmlFile.exists() || !usepix.equals("")) {
+            btnpay.setEnabled(true);
         } else {
             btnpay.setEnabled(false);
         }
 
         //setStyles(18, 0);
         String slinhatrab = Linha_Trab;
-        System.out.println("Vou chamar Select_Linha: "+slinhatrab);
+        System.out.println("Vou chamar Select_Linha: " + slinhatrab);
         if (slinhatrab.equals("")) {
             // Select_Linha();
 
@@ -540,8 +551,8 @@ public class ViaActivity extends AppCompatActivity {
 
 
         //VINCULANDO O LISTVIEW DA TELA AO OBJETO CRIADO
-        listMenu = (ListView)this.findViewById(R.id.itens_Menu);
-        listViewBPe = (ListView)this.findViewById(R.id.itens_Menu);
+        listMenu = (ListView) this.findViewById(R.id.itens_Menu);
+        listViewBPe = (ListView) this.findViewById(R.id.itens_Menu);
         getWindow().setSoftInputMode(
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
@@ -554,22 +565,23 @@ public class ViaActivity extends AppCompatActivity {
 
             @Override
             public void onReturnString(final String value) throws RemoteException {
-                Log.i(TAG,"printlength:" + value + "\n");
+                Log.i(TAG, "printlength:" + value + "\n");
             }
 
             @Override
             public void onRaiseException(int code, final String msg) throws RemoteException {
-                Log.i(TAG,"onRaiseException: " + msg);
-                runOnUiThread(new Runnable(){
+                Log.i(TAG, "onRaiseException: " + msg);
+                runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         info.append("onRaiseException = " + msg + "\n");
-                    }});
+                    }
+                });
 
             }
         };
 
-        Intent intent=new Intent();
+        Intent intent = new Intent();
         intent.setPackage("woyou.aidlservice.jiuiv5");
         intent.setAction("woyou.aidlservice.jiuiv5.IWoyouService");
         startService(intent);
@@ -577,10 +589,10 @@ public class ViaActivity extends AppCompatActivity {
 
 
         ///////
-        System.out.println("Retornei da Select_Linha: "+slinhatrab);
+        System.out.println("Retornei da Select_Linha: " + slinhatrab);
         if (!printfManager.isConnect()) {
             Log.d(TAG, "Impressora não conectada, abrindo PrintfBlueListActivity");
-            PrintfBlueListActivity.startActivity(ViaActivity.this);
+            //PrintfBlueListActivity.startActivity(ViaActivity.this);
 
         }
 
@@ -596,15 +608,12 @@ public class ViaActivity extends AppCompatActivity {
 
                     Toast.makeText(ViaActivity.this, "O Valor do Seguro foi incluso.", Toast.LENGTH_LONG).show();
                     Confere_campos();
-                }
-                else if (!ckbSeguro.isChecked())
-                {
+                } else if (!ckbSeguro.isChecked()) {
                     Toast.makeText(ViaActivity.this, "O Valor do Seguro foi retirado.", Toast.LENGTH_LONG).show();
                     Confere_campos();
                 }
             }
         });
-
 
 
         Button btnViagem = findViewById(R.id.btnVia);
@@ -631,7 +640,7 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnOrigem = findViewById(R.id.btnOri);
-        btnOrigem.setOnClickListener(new View.OnClickListener(){
+        btnOrigem.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 EditText edtVia = findViewById(R.id.edtVia);
                 String sVia = edtVia.getText().toString();
@@ -661,7 +670,7 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnDestino = findViewById(R.id.btnDes);
-        btnDestino.setOnClickListener(new View.OnClickListener(){
+        btnDestino.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 EditText edtVia = findViewById(R.id.edtVia);
                 String sVia = edtVia.getText().toString();
@@ -694,9 +703,8 @@ public class ViaActivity extends AppCompatActivity {
         findViewById(R.id.btnIdent).setOnClickListener(Verifica_campos_viagem);
 
 
-
         Button btnmais = findViewById(R.id.btnMais);
-        btnmais.setOnClickListener(new View.OnClickListener(){
+        btnmais.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 TextView edtqtd = findViewById(R.id.edtQtd);
                 String sqtd = edtqtd.getText().toString();
@@ -711,7 +719,7 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnmenos = findViewById(R.id.btnMenos);
-        btnmenos.setOnClickListener(new View.OnClickListener(){
+        btnmenos.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 TextView edtqtd = findViewById(R.id.edtQtd);
                 String sqtd = edtqtd.getText().toString();
@@ -726,7 +734,7 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnconexao = findViewById(R.id.btnConexao);
-        btnconexao.setOnClickListener(new View.OnClickListener(){
+        btnconexao.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 EditText edtvia = findViewById(R.id.edtVia);
                 EditText edtori = findViewById(R.id.edtOrigem);
@@ -742,14 +750,14 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnPagto = findViewById(R.id.btnPagamento);
-        btnPagto.setOnClickListener(new View.OnClickListener(){
+        btnPagto.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 TextView txtTarifa = findViewById(R.id.txtValor);
                 String svalor = txtTarifa.getText().toString();
                 DB_EMP dbemp = new DB_EMP(ViaActivity.this);
-                String sultbil = dbemp.Busca_Dados_Emp(1,"Ultbil");
+                String sultbil = dbemp.Busca_Dados_Emp(1, "Ultbil");
                 if (!svalor.equals("0.00")) {
-                    svalor = svalor.replace(",","");
+                    svalor = svalor.replace(",", "");
                     int ivalor = Integer.parseInt(svalor);
                     int idoc = Integer.parseInt(sultbil);
                     GuardaPagto = "";
@@ -763,27 +771,38 @@ public class ViaActivity extends AppCompatActivity {
         });
 
         Button btnPay = findViewById(R.id.btnPay);
-        btnPay.setOnClickListener(new View.OnClickListener(){
+        btnPay.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 TextView txtTarifa = findViewById(R.id.txtValor);
                 String svalor = txtTarifa.getText().toString();
                 DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+                TextView edtqtd = findViewById(R.id.edtQtd);
+                String sqtd = edtqtd.getText().toString();
+                int iqtd = Integer.parseInt(sqtd);
+                GuardaQtd = iqtd;
                 GuardaPagto = "";
                 Guarda_QRcode = "";
                 if (!svalor.equals("0.00")) {
-                    svalor = svalor.replace(",","");
-                    int ivalor = Integer.parseInt(svalor);
-                        //ivalor = (ivalor * 100);
-                        String svalpay = Integer.toString(ivalor);
-                        Guarda_valor = svalpay;
-                        File fXmlFiledel = new File(getExternalFilesDir("Download").getAbsolutePath() + "/qrcode.xml");
-                        boolean bfileexist = fXmlFiledel.exists();
-                        if (bfileexist) {
-                            fXmlFiledel.delete();
-                        }
-                        dbemp.Atualizar_Campo_Emp("1", "Ultqrc", "");
-                        GuardaMobi = "";
-                        openCamera(svalpay);
+                    Guarda_valor = svalor;
+                    File fXmlFiledel = new File(getExternalFilesDir("Download").getAbsolutePath() + "/qrcode.xml");
+                    boolean bfileexist = fXmlFiledel.exists();
+                    if (bfileexist) {
+                        fXmlFiledel.delete();
+                    }
+                    dbemp.Atualizar_Campo_Emp("1", "Ultqrc", "");
+                    GuardaMobi = "";
+                    WScomando = "VERIFICA_CONEXAO";
+                    // Verificar conexão com a internet
+                    String surl = dbemp.Busca_Dados_Emp(1, "Endews");
+                    Intent myIntent = new Intent(ViaActivity.this, WSActivity.class);
+                    Bundle bundle = new Bundle();
+                    bundle.putString("USUARIO", Nome_user);
+                    bundle.putString("URLWS", surl);
+                    bundle.putString("COMANDO","CONEXAO");
+                    bundle.putString("Activity_Dados","17");
+                    myIntent.putExtras(bundle);
+                    resultadoActivity.launch(myIntent);
+                    //String spag =  infPagamento("Informe a Forma de Pagamento");
 
 
                 }
@@ -793,37 +812,32 @@ public class ViaActivity extends AppCompatActivity {
         });
 
 
-
         Button btnFinaliza = findViewById(R.id.btnFinalizar);
         btnFinaliza.setEnabled(false);
-        btnFinaliza.setOnClickListener(new View.OnClickListener(){
+        btnFinaliza.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 PagWS = "";
-                Inicia_Venda();
+                Inicia_Venda(0);
             }
         });
-
-
-
-
-
 
 
         listMenu.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (position == 0){
+                if (position == 0) {
                     CarregarBilhetesCadastrados();
-                } else if (position == 1){
+                } else if (position == 1) {
                     Abre_Consulta();
-                } else if (position == 2){
-                    String susuario = Nome_user;
-                    if (susuario.equals("HMINFO") || susuario.equals("CAIXA")) { Abre_Parametros();}
-                } else if (position == 3){
+                } else if (position == 2) {
+                    Abre_Parametros();
+                } else if (position == 3) {
                     DB_USR dbusr = new DB_USR(ViaActivity.this);
-                    String sfectur = dbusr.Busca_Dados_Usr(Nome_user,"Fectur");
-                    if (sfectur.equals("S")) {Chama_Encerrar();}
-                } else if (position == 4){
+                    String sfectur = dbusr.Busca_Dados_Usr(Nome_user, "Fectur");
+                    if (sfectur.equals("S")) {
+                        Chama_Encerrar();
+                    }
+                } else if (position == 4) {
                     WScomando = "PENDENTES";
                     Chama_Verifica("");
                 }
@@ -832,28 +846,26 @@ public class ViaActivity extends AppCompatActivity {
         });
 
 
-
         Menu_Lateral();
         Inicia_Mobipix();
 
         DB_EMP dbemp = new DB_EMP(ViaActivity.this);
         DB_EMP.EmpCursor cursor = dbemp.RetornarEmp(DB_EMP.EmpCursor.OrdenarPor.NomeCrescente);
 
-        for( int i=0; i <cursor.getCount(); i++)
-        {
+        for (int i = 0; i < cursor.getCount(); i++) {
             cursor.moveToPosition(i);
 
 
         }
 
         if (cursor.getCount() != 0) { //se existe alguma empresa cadastrada
-		    WScomando = "PENDENTES";
+            WScomando = "PENDENTES";
             Chama_Verifica("E");
         }
 
         //File sdCard = getExternalStorageDirectory();
         File sdCard = getExternalFilesDir("Download");
-        File dir = new File(sdCard.getAbsolutePath() );
+        File dir = new File(sdCard.getAbsolutePath());
         dir.mkdirs();
         File file = new File(dir, "KEYEMP.xml");
         if (file.exists()) {
@@ -884,13 +896,11 @@ public class ViaActivity extends AppCompatActivity {
         }
 
 
-
-
         // Inicia o processamento ao carregar a activity (se desejado)
         WScomando = "PENDENTES";
         Chama_Verifica("E");
 
-       // Registre o ActivityResultLauncher no onCreate
+        // Registre o ActivityResultLauncher no onCreate
         forResult = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -958,20 +968,21 @@ public class ViaActivity extends AppCompatActivity {
 
     private void initData() {
         try {
-            printfManager = PrintfManager.getInstance(ViaActivity.this);
+            printfManager = PrintfManager.getInstance(context);
             if (printfManager == null) {
                 Log.e(TAG, "Falha ao inicializar PrintfManager");
                 Util.ToastText(context, "Erro: Falha ao inicializar impressora");
                 return;
             }
-            //listData = new ArrayList<>();
-            //listData.add(new Mode("Test-P26", 200, 320));
-            //listData.add(new Mode("Test-P16", 20, 188));
-            printfManager.defaultConnection(ViaActivity.this);
+            if (!printfManager.isConnect()) {
+                listData = new ArrayList<>();
+                listData.add(new Mode("Test-P26", 200, 320));
+                listData.add(new Mode("Test-P16", 20, 188));
+                printfManager.defaultConnection(ViaActivity.this);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Erro em initData: " + e.getMessage());
             Util.ToastText(context, "Erro ao inicializar dados");
-            PrintfBlueListActivity.startActivity(ViaActivity.this);
         }
     }
 
@@ -1036,7 +1047,7 @@ public class ViaActivity extends AppCompatActivity {
             //Verifica se a transmissao demorou mais de 1 minuto
             long intervalo = Funcoes_Android.validaDate(shorini, shorfin);
             if (intervalo > 30) {
-			    WScomando = "PENDENTES";
+                WScomando = "PENDENTES";
                 Chama_Verifica("");
             }
 
@@ -1048,7 +1059,7 @@ public class ViaActivity extends AppCompatActivity {
         return super.dispatchTouchEvent(ev);
     }
 
-    private void openCamera(String svalor){
+    private void openCamera(String svalor) {
         DB_EMP dbemp = new DB_EMP(ViaActivity.this);
         String smodimp = dbemp.Busca_Dados_Emp(1, "Modimp");
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -1056,7 +1067,7 @@ public class ViaActivity extends AppCompatActivity {
             Guarda_valor = svalor;
             Activity_Dados = 104;
             //Intent intentz = new Intent("com.google.zxing.client.android.SCAN");
-            Intent intentz = new Intent(getApplicationContext(),CaptureActivity.class);
+            Intent intentz = new Intent(getApplicationContext(), CaptureActivity.class);
             intentz.setAction("com.google.zxing.client.android.SCAN");
             intentz.putExtra("SAVE_HISTORY", false);
             // QR_CODE_MODE: QRCODE , ONE_D_MODE: Codigo de barras
@@ -1066,7 +1077,8 @@ public class ViaActivity extends AppCompatActivity {
             intentz.putExtras(bundle);
 
             // chama esse intent e aguarda resultado
-            startForresult.launch(intentz);;
+            startForresult.launch(intentz);
+            ;
         } else {
             //Bluetooth desativado
             infMensagens("Bluetooth está Desativado\n\n" + "Ative antes de Prosseguir", "");
@@ -1076,8 +1088,7 @@ public class ViaActivity extends AppCompatActivity {
     }
 
 
-
-    View.OnClickListener Verifica_campos_viagem = new View.OnClickListener(){
+    View.OnClickListener Verifica_campos_viagem = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
             final EditText edtVia = findViewById(R.id.edtVia);
@@ -1093,93 +1104,115 @@ public class ViaActivity extends AppCompatActivity {
             String sDefaultOrigem = "Selecione a Origem";
             String sDefaultDestino = "Selecione o Destino";
 
-            if(sVia.equals(sDefaultViagem) || sOri.equals(sDefaultOrigem) || sDest.equals(sDefaultDestino)){
+            if (sVia.equals(sDefaultViagem) || sOri.equals(sDefaultOrigem) || sDest.equals(sDefaultDestino)) {
                 CharSequence text = "Preencha os campos Viagem, Origem e Destino!";
                 int duration = Toast.LENGTH_LONG;
 
-                Toast toast = Toast.makeText(ViaActivity.this , text, duration);
+                Toast toast = Toast.makeText(ViaActivity.this, text, duration);
                 toast.show();
-            }else{
+            } else {
                 infPassageiro(v);
             }
 
         }
     };
 
-   public void Inicia_Venda() {
-       DB_EMP dbemp = new DB_EMP(ViaActivity.this);
-       String smodimp = dbemp.Busca_Dados_Emp(1, "Modimp");
-       BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-       if (bluetoothAdapter.isEnabled() || !smodimp.equals("03") || !smodimp.equals("05")) {//se estiver ligado ou se for outro modelo de impressora
-           TextView edtqtd = findViewById(R.id.edtQtd);
-           String sqtd = edtqtd.getText().toString();
-           int iqtd = Integer.parseInt(sqtd);
-           GuardaQtd = iqtd;
-           Chama_Fechamento();
-           edtqtd.setText("1");
-       } else {
-           //Bluetooth desativado
-           infMensagens("Bluetooth está Desativado\n\n" + "Ative antes de Prosseguir", "");
-       }
-
-   }
-
-   public void Inicia_Mobipix() {
+    @SuppressLint("MissingPermission")
+    public void Inicia_Venda(int iqtdtela) {
         DB_EMP dbemp = new DB_EMP(ViaActivity.this);
-       String stipamb = dbemp.Busca_Dados_Emp(1, "Tipamb");
-       String sambiente = "";
-       String sIDApi = "";
-       String sKeyApi = "";
-       if (stipamb.equals("1")) { sambiente = "PROD";} //Producao
-       if (!stipamb.equals("1")) { sambiente = "QA";} //Ambiente de testes
-       //Procurar XML com as chaves
-       try {
-           DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-           DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-           File fXmlFile = new File(getExternalFilesDir("Download").getAbsolutePath() + "/MOBIPIX.xml");
-           Document doc = dBuilder.parse(fXmlFile);
-           doc.getDocumentElement().normalize();
-           NodeList nodeResponse = doc.getElementsByTagName("MobipixValues");
-           for (int temp = 0; temp < nodeResponse.getLength(); temp++) {
+        String smodimp = dbemp.Busca_Dados_Emp(1, "Modimp");
+        try {
 
-               Node nNode = nodeResponse.item(temp);
-               if (nNode.getNodeType() == Node.ELEMENT_NODE) {
-                   Element eElement = (Element) nNode;
+            if (printerBluetooth == null)
+                tryEnableBluetooth();
+            if (printerBluetooth == null)
+                return;
+
+            BluetoothSocket impressora = printerBluetooth.createInsecureRfcommSocketToServiceRecord(UUID.randomUUID());
+
+            impressora.connect();
+            try {
+                TextView edtqtd = findViewById(R.id.edtQtd);
+                String sqtd = edtqtd.getText().toString();
+                int iqtd = Integer.parseInt(sqtd);
+                GuardaQtd = iqtd;
+                if (iqtdtela != 0) {
+                    GuardaQtd = iqtdtela;
+                }
+                Log.i(TAG, "GuardaQtd: " + GuardaQtd);
+                Chama_Fechamento();
+                edtqtd.setText("1");
+
+            } finally {
+                // btnPrint.setEnabled(true);
+                impressora.close();
+            }
+        } catch (Exception e) {
+            tryEnableBluetooth();
+            //Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+
+    }
+
+    public void Inicia_Mobipix() {
+        DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+        String stipamb = dbemp.Busca_Dados_Emp(1, "Tipamb");
+        String sambiente = "";
+        String sIDApi = "";
+        String sKeyApi = "";
+        if (stipamb.equals("1")) {
+            sambiente = "PROD";
+        } //Producao
+        if (!stipamb.equals("1")) {
+            sambiente = "QA";
+        } //Ambiente de testes
+        //Procurar XML com as chaves
+        try {
+            DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+            File fXmlFile = new File(getExternalFilesDir("Download").getAbsolutePath() + "/MOBIPIX.xml");
+            Document doc = dBuilder.parse(fXmlFile);
+            doc.getDocumentElement().normalize();
+            NodeList nodeResponse = doc.getElementsByTagName("MobipixValues");
+            for (int temp = 0; temp < nodeResponse.getLength(); temp++) {
+
+                Node nNode = nodeResponse.item(temp);
+                if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element eElement = (Element) nNode;
 
 
-                   sIDApi = eElement.getElementsByTagName("AppID").item(0).getTextContent();
-                   sKeyApi = eElement.getElementsByTagName("ApiKey").item(0).getTextContent();
+                    sIDApi = eElement.getElementsByTagName("AppID").item(0).getTextContent();
+                    sKeyApi = eElement.getElementsByTagName("ApiKey").item(0).getTextContent();
 
-               }
-           }
+                }
+            }
 
-       } catch (Exception e) {
-           e.printStackTrace();
-       }
-
-
-       try {
-               com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.init(ViaActivity.this, sambiente, sIDApi, sKeyApi, "HM", new OnboardCallback<MobiPixResponseDTO<InitResponseDTO>>() {
-                   @Override
-                   public void onSuccess(MobiPixResponseDTO<InitResponseDTO> response) {
-                       // processar a logica de sucesso
-                       Log.i(TAG,"callbackpay INI: " + response.getStatus());
-                   }
-
-                   @Override
-                   public void onError(MobiPixResponseDTO<InitResponseDTO> response) {
-                       // processar a logica de sucesso
-                   }
-               });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
 
-       } catch (Exception e) {
-           Log.i(TAG,"Erro Callback: " + e.toString());
-           infMensagens("Erro: "+e.toString(), "");
-       }
+        try {
+            com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.init(ViaActivity.this, sambiente, sIDApi, sKeyApi, "HM", new OnboardCallback<MobiPixResponseDTO<InitResponseDTO>>() {
+                @Override
+                public void onSuccess(MobiPixResponseDTO<InitResponseDTO> response) {
+                    // processar a logica de sucesso
+                    Log.i(TAG, "callbackpay INI: " + response.getStatus());
+                }
 
-   }
+                @Override
+                public void onError(MobiPixResponseDTO<InitResponseDTO> response) {
+                    // processar a logica de sucesso
+                }
+            });
 
+
+        } catch (Exception e) {
+            Log.i(TAG, "Erro Callback: " + e.toString());
+            infMensagens("Erro: " + e.toString(), "");
+        }
+
+    }
 
 
     public void Chama_Fechamento() {
@@ -1190,7 +1223,9 @@ public class ViaActivity extends AppCompatActivity {
         String svai = "";
         if (!scad.equals("")) {
             int icad = Integer.parseInt(scad);
-            if (icad < 60) { svai = "S";}
+            if (icad < 60) {
+                svai = "S";
+            }
         } else {
             svai = "S";
         }
@@ -1213,12 +1248,11 @@ public class ViaActivity extends AppCompatActivity {
     }
 
 
-
     //Funcao que chama Dialog para selecionar a Linha de trabalho
-    public void Select_Linha(){
+    public void Select_Linha() {
         // Initializing a new alert dialog
-        ContextThemeWrapper cw = new ContextThemeWrapper( this, R.style.AlertDialogTheme );
-        final AlertDialog.Builder builder = new AlertDialog.Builder( cw );
+        ContextThemeWrapper cw = new ContextThemeWrapper(this, R.style.AlertDialogTheme);
+        final AlertDialog.Builder builder = new AlertDialog.Builder(cw);
 
         // Set the alert dialog title
         builder.setTitle("Em qual Linha vamos trabalhar?");
@@ -1229,10 +1263,9 @@ public class ViaActivity extends AppCompatActivity {
         List<String> itens = new ArrayList();
         DB_LIN db = new DB_LIN(ViaActivity.this);
         DB_LIN.LinCursor cursor = db.RetornarLin(DB_LIN.LinCursor.OrdenarPor.NomeCrescente);
-        for( int i=0; i <cursor.getCount(); i++)
-        {
+        for (int i = 0; i < cursor.getCount(); i++) {
             cursor.moveToPosition(i);
-            sLinha = (sLinha+cursor.getCodigo()+"-"+cursor.getDescri())+",";
+            sLinha = (sLinha + cursor.getCodigo() + "-" + cursor.getDescri()) + ",";
 
         }
 
@@ -1267,7 +1300,7 @@ public class ViaActivity extends AppCompatActivity {
                 // Just dismiss the alert dialog after selection
                 // Or do something now
 
-               // Toast.makeText(ViaActivity.this, "Confirmar: " + i, Toast.LENGTH_LONG).show();
+                // Toast.makeText(ViaActivity.this, "Confirmar: " + i, Toast.LENGTH_LONG).show();
             }
         });
 
@@ -1286,12 +1319,14 @@ public class ViaActivity extends AppCompatActivity {
             protected boolean onClicked() {
                 String slinSel = Linha_Trab;
                 boolean bclick = true;
-                if (!slinSel.equals("")){
-                     bclick = true;
+                if (!slinSel.equals("")) {
+                    bclick = true;
                     //return true;//Retornando true fecha o dialog
                     DB_EMP dbempv = new DB_EMP(ViaActivity.this);
                     String sconvei = dbempv.Busca_Dados_Emp(1, "Convei");
-                    if (sconvei.equals("S")) { infVeiculo(); } //se controla veiculos
+                    if (sconvei.equals("S")) {
+                        infVeiculo();
+                    } //se controla veiculos
                 } else if (slinSel.equals("")) {
                     Toast.makeText(ViaActivity.this, "Selecione uma Linha.", Toast.LENGTH_LONG).show();
                     bclick = false;
@@ -1361,9 +1396,6 @@ public class ViaActivity extends AppCompatActivity {
     }
 
 
-
-
-
     private void Start_Cielo() {
         /*String sID = "";
         String sToken = "";
@@ -1398,7 +1430,6 @@ public class ViaActivity extends AppCompatActivity {
         orderManager = new OrderManager(credentials, this);
         orderManager.bind(this, null);*/
     }
-
 
 
     private void configSDK_Cancel(final String snumero, final String smotivo2) {
@@ -1468,8 +1499,6 @@ public class ViaActivity extends AppCompatActivity {
     }
 
 
-
-
     public void cancelPayment(final String snumero, final String smotivo2) {
 
         /*if (ordercancel != null && ordercancel.getPayments().size() > 0) {
@@ -1515,7 +1544,6 @@ public class ViaActivity extends AppCompatActivity {
     }
 
 
-
     public abstract class DialogButtonClickWrapper implements View.OnClickListener {
 
         private AlertDialog dialog;
@@ -1527,7 +1555,7 @@ public class ViaActivity extends AppCompatActivity {
 
         public void onClick(View v) {
 
-            if(onClicked()){
+            if (onClicked()) {
                 dialog.dismiss();
             }
         }
@@ -1563,7 +1591,7 @@ public class ViaActivity extends AppCompatActivity {
         spntipdes.setAdapter(spntipdesAdapter);
 
         final EditText edtnomepas = view.findViewById(R.id.edtnome);
-        edtnomepas.setFilters(new InputFilter[] {new InputFilter.AllCaps()});
+        edtnomepas.setFilters(new InputFilter[]{new InputFilter.AllCaps()});
 
 
         builder.setView(view)
@@ -1594,14 +1622,13 @@ public class ViaActivity extends AppCompatActivity {
                 });
 
 
-
         AlertDialog alert = builder.create();
         alert.show();
         final EditText edtcpfcli = view.findViewById(R.id.edtCPF);
         edtcpfcli.setOnFocusChangeListener(new View.OnFocusChangeListener() {
 
             public void onFocusChange(View v, boolean hasFocus) {
-                if(!hasFocus){
+                if (!hasFocus) {
 
                 }
             }
@@ -1613,11 +1640,11 @@ public class ViaActivity extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {
 
-                if(s.length() == 11){
+                if (s.length() == 11) {
                     //Procurar se Existe Dados no WS
                     String scpfcli = edtcpfcli.getText().toString();
                     //Procurar se existe cadastro
-                    if (scpfcli.length() >=11 && !scpfcli.equals("CPF (Opcional)")) {
+                    if (scpfcli.length() >= 11 && !scpfcli.equals("CPF (Opcional)")) {
                         boolean bvalida = Funcoes_Android.validaCPF(scpfcli);
                         EditText edtpas = findViewById(R.id.edtNomePas);
                         EditText edtdoc = findViewById(R.id.edtDocPas);
@@ -1633,10 +1660,10 @@ public class ViaActivity extends AppCompatActivity {
                             String origem = GuardaOri;
                             String destino = GuardaDes;
                             String dataatu = Funcoes_Android.getCurrentUTC();
-                            String sdata = dataatu.substring(0,10);
+                            String sdata = dataatu.substring(0, 10);
                             String sano = sdata.substring(0, 4);
                             String smes = sdata.substring(5, 7);
-                            String smesatu = (smes+sano);
+                            String smesatu = (smes + sano);
                             //procura os dados do percurso para encontrar sentido da viagem
                             DB_PER dbp = new DB_PER(ViaActivity.this);
                             DB_PER.PercursosCursor cursorper = dbp.RetornarPercursos(DB_PER.PercursosCursor.OrdenarPor.NomeCrescente);
@@ -1672,10 +1699,9 @@ public class ViaActivity extends AppCompatActivity {
 
                             myIntent.putExtras(bundle);
 
-                                System.out.println("Lançando verificaUsuarioGratuidade: ");
-                                viewDialog = view;
-                                forResult.launch(myIntent);
-
+                            System.out.println("Lançando verificaUsuarioGratuidade: ");
+                            viewDialog = view;
+                            forResult.launch(myIntent);
 
 
                         } else {
@@ -1726,9 +1752,9 @@ public class ViaActivity extends AppCompatActivity {
                 edtpas.setText(snome);
                 edtdoc.setText(sdoc);
                 edtcpfpas.setText(scpf);
-                stipgra = stipgra.substring(0,2);
+                stipgra = stipgra.substring(0, 2);
                 edttipgra.setText(stipgra);
-                edttipdes.setText(stipdes.substring(0,1));
+                edttipdes.setText(stipdes.substring(0, 1));
                 String stipdoc = spinner.getSelectedItem().toString();
                 TipoDoc = stipdoc;
                 int qtddoc = sdoc.length();
@@ -1775,7 +1801,7 @@ public class ViaActivity extends AppCompatActivity {
                         svalida = "E";
 
                     }
-                    if (stipdes.equals("") || stipdes.equals("Sem Desconto")){
+                    if (stipdes.equals("") || stipdes.equals("Sem Desconto")) {
                         sERRO = sERRO + "Para Gratuidade é obrigatório \n Informar o Tipo de Desconto.\n";
                         //infMensagens("Para Gratuidade é obrigatório \n Informar o Tipo de Desconto.", "");
                         //Toast.makeText(ViaActivity.this, "Para Gratuidade é obrigatório \n Informar o Tipo de Desconto.", Toast.LENGTH_LONG).show();
@@ -1791,15 +1817,15 @@ public class ViaActivity extends AppCompatActivity {
 
                 //CASO SEJA GRATUIDADE, VALIDAR CONDICOES DE USO
                 if (!stipgra.equals("") && !stipgra.equals("00")) {
-                   int qtduse = 0;
+                    int qtduse = 0;
                     String linha = Linha_Trab;
                     String origem = GuardaOri;
                     String destino = GuardaDes;
                     String dataatu = Funcoes_Android.getCurrentUTC();
-                    String sdata = dataatu.substring(0,10);
+                    String sdata = dataatu.substring(0, 10);
                     String sano = sdata.substring(0, 4);
                     String smes = sdata.substring(5, 7);
-                    String smesatu = (smes+sano);
+                    String smesatu = (smes + sano);
 
                     //procura os dados do percurso para encontrar sentido da viagem
                     DB_PER dbp = new DB_PER(ViaActivity.this);
@@ -1810,7 +1836,7 @@ public class ViaActivity extends AppCompatActivity {
                         if (cursorper.getLinha().equals(linha)) {//mesma linha
                             if (cursorper.getOrigem().equals(origem)) {//mesma origem
                                 if (cursorper.getDestino().equals(destino)) {//mesmo destino
-                                   ssentido = cursorper.getTipvia();
+                                    ssentido = cursorper.getTipvia();
                                 }
                             }
                         }
@@ -1825,19 +1851,19 @@ public class ViaActivity extends AppCompatActivity {
                         String slinhaDB = cursor.getLinha();
                         String ssentidoDB = cursor.getSentido();
                         if (!scpfDB.equals("")) { //se encontrou algumr egistro
-                            if (scpfDB.equals(scpf) && slinhaDB.equals(linha) && smesDB.equals(smesatu) &&ssentidoDB.equals(ssentido)) {//se encontrou mesmos dados
-                                 String sqtduse = cursor.getQtdpas();
-                                 qtduse = Integer.parseInt(sqtduse);
-                                 if (qtduse >= 2) {
-                                     svalida = "E";
-                                     sERRO = sERRO + "Usuario excedeu limite para esta linha no mês.\n";
-                                 }
+                            if (scpfDB.equals(scpf) && slinhaDB.equals(linha) && smesDB.equals(smesatu) && ssentidoDB.equals(ssentido)) {//se encontrou mesmos dados
+                                String sqtduse = cursor.getQtdpas();
+                                qtduse = Integer.parseInt(sqtduse);
+                                if (qtduse >= 2) {
+                                    svalida = "E";
+                                    sERRO = sERRO + "Usuario excedeu limite para esta linha no mês.\n";
+                                }
                             }
                         }
                     }
                 }
 
-                if(!svalida.equals("E")){
+                if (!svalida.equals("E")) {
                     //Verificar se o cadastro existe, caso não exista, efeturar nesse momento
                     if (!stipgra.equals("") && !stipgra.equals("00")) {
                         String susergra = "";
@@ -1862,7 +1888,7 @@ public class ViaActivity extends AppCompatActivity {
                             String dataatu = Funcoes_Android.getCurrentUTC();
                             String sano = dataatu.substring(0, 4);
                             String smes = dataatu.substring(5, 2);
-                            String smesatu = (smes+sano);
+                            String smesatu = (smes + sano);
                             //procura os dados do percurso para encontrar sentido da viagem
                             DB_PER dbp = new DB_PER(ViaActivity.this);
                             DB_PER.PercursosCursor cursorper = dbp.RetornarPercursos(DB_PER.PercursosCursor.OrdenarPor.NomeCrescente);
@@ -1905,8 +1931,7 @@ public class ViaActivity extends AppCompatActivity {
                             forResult.launch(myIntent);
 
 
-
-                       }
+                        }
                     }
                     return true;//Retornando true fecha o dialog
                 } else {
@@ -1922,7 +1947,6 @@ public class ViaActivity extends AppCompatActivity {
         pbutton.setTextColor(Color.parseColor("#20910f"));
 
     }
-
 
 
     //Chama Dialog para informar Motivo de cancelamento ou nao embarque
@@ -1946,10 +1970,10 @@ public class ViaActivity extends AppCompatActivity {
         final EditText edtmotivo2 = view.findViewById(R.id.edtMotivo);
         edtmotivo2.setEnabled(false);
 
-        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
             @Override
-            public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3){
+            public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
                 //int item = arg0.getSelectedItemPosition();
                 if (arg2 == 5) {
                     edtmotivo2.setEnabled(true);
@@ -1958,6 +1982,7 @@ public class ViaActivity extends AppCompatActivity {
                     edtmotivo2.setEnabled(false);
                 }
             }
+
             @Override
             public void onNothingSelected(AdapterView<?> arg0) {
             }
@@ -1985,9 +2010,9 @@ public class ViaActivity extends AppCompatActivity {
                         }
 
                         SmotivoWS = smotivo2;
-                        Log.i(TAG,"smotivo2: " + smotivo2);
+                        Log.i(TAG, "smotivo2: " + smotivo2);
                         if (!smotivo2.equals("")) {
-                                Chama_Cancela(snumero, smotivo2);
+                            Chama_Cancela(snumero, smotivo2);
 
                         }
 
@@ -2007,7 +2032,7 @@ public class ViaActivity extends AppCompatActivity {
         pbutton.setTextColor(Color.parseColor("#EE6363"));
 
         sretmot = SmotivoWS;
-        return  sretmot;
+        return sretmot;
 
     }
 
@@ -2037,7 +2062,6 @@ public class ViaActivity extends AppCompatActivity {
                     public void onClick(DialogInterface dialog, int id) {
 
 
-
                     }
                 });
 
@@ -2047,13 +2071,226 @@ public class ViaActivity extends AppCompatActivity {
         //mudar a cor do botao de confirmar
         Button pbutton = alert.getButton(DialogInterface.BUTTON_POSITIVE);
         pbutton.setTextColor(Color.parseColor("#20910f"));
-       if (sGrave.equals("S")) {
-           pbutton.setEnabled(false);
+        if (sGrave.equals("S")) {
+            pbutton.setEnabled(false);
 
-       }
+        }
         sretmot = SmotivoWS;
-        return  sretmot;
+        return sretmot;
 
+    }
+
+    private void initiatePixPayment(View view, TextView txtPaymentStatus, ImageView imageViewQrCode, Button btnRecheckPayment, AlertDialog alert, int iqtd) {
+
+
+        isPolling = true;
+        btnRecheckPayment.setEnabled(false);
+        runOnUiThread(() -> txtPaymentStatus.setText("Aguardando pagamento..."));
+
+        ExecutorService server = Executors.newSingleThreadExecutor();
+        server.execute(() -> {
+            try {
+                DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+                File dircert = new File(getExternalFilesDir("Download").getAbsolutePath());
+                String scertificado = dircert + "/" + dbemp.Busca_Dados_Emp(1, "Bancrt");
+                String pfxPassword = dbemp.Busca_Dados_Emp(1, "Bansen");
+                String clientId = dbemp.Busca_Dados_Emp(1, "Cliidb");
+                String clientSecret = dbemp.Busca_Dados_Emp(1, "Clisec");
+                String baseUrl = dbemp.Busca_Dados_Emp(1, "Banwse");
+                String svalorvenda = Guarda_valor;
+                svalorvenda = svalorvenda.replace(',', '.');
+                String sserie = dbemp.Busca_Dados_Emp(1, "Serie");
+                String sultimo = dbemp.Busca_Dados_Emp(1, "Ultbil");
+                String snumpdv = dbemp.Busca_Dados_Emp(1, "Idepdv");
+                int iultimo = Integer.parseInt(sultimo);
+                int iproximo = iultimo + 1;
+                String sbilhete = Integer.toString(iproximo);
+                String ntxtunic = snumpdv + sserie + sbilhete;
+
+                ConsomeAPI_BAN client = new ConsomeAPI_BAN(baseUrl, scertificado, pfxPassword);
+                String accessToken = client.getAccessToken(clientId, clientSecret);
+                String qrCodeText = client.getQrcodePix(
+                        accessToken,
+                        dbemp.Busca_Dados_Emp(1, "Banchv"),
+                        dbemp.Busca_Dados_Emp(1, "Descri"),
+                        svalorvenda,
+                        ntxtunic,
+                        sbilhete
+                );
+
+                if (!qrCodeText.isEmpty()) {
+                    runOnUiThread(() -> {
+                        ImageView imgqrcode = view.findViewById(R.id.imgQRC);
+                        Bitmap qrcodeBMP = QRCodeGenerator.displayQRCode(qrCodeText, imgqrcode, 150, 150);
+                        imgqrcode.setImageBitmap(qrcodeBMP);
+                    });
+                }
+
+                Date qrCodeDate = new Date();
+                startPolling(client, accessToken, ntxtunic, qrCodeDate, txtPaymentStatus, btnRecheckPayment, alert, iqtd);
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    System.out.println("Erro PIX: " + e.getMessage());
+                    txtPaymentStatus.setText("Erro: " + e.getMessage());
+                    btnRecheckPayment.setEnabled(true);
+                    isPolling = false;
+                    simpleProgressBar.setVisibility(view.INVISIBLE);
+                });
+                e.printStackTrace();
+            } finally {
+                server.shutdown();
+            }
+        });
+    }
+
+
+    ////Selecionar Forma de Pagamento
+    public String infPagamento(final String sMsg, int iQtdtela) {
+        String sretmot = "";
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        // Get the layout inflater
+        LayoutInflater inflater = getLayoutInflater();
+
+        // Inflate and set the layout for the dialog
+        // Pass null as the parent view because its going in the dialog layout
+        final View view = inflater.inflate(R.layout.activity_pagamento, null);
+
+        // Spinner element
+        final Spinner spinner = view.findViewById(R.id.spnFormas);
+
+        ArrayAdapter spinnerAdapter = ArrayAdapter.createFromResource(this, R.array.formas_array,
+                android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(spinnerAdapter);
+
+        final TextView txtmens = view.findViewById(R.id.txtTop);
+        final ImageView imageViewQrCode = view.findViewById(R.id.imgQRC);
+        final TextView txtPaymentStatus = view.findViewById(R.id.txtPaymentStatus);
+        final Button btngerpay = view.findViewById(R.id.btnGerpay);
+        final Button btnRecheckPayment = view.findViewById(R.id.btnRecheckPayment);
+        simpleProgressBar = view.findViewById(R.id.simpleProgressBar);
+        txtmens.setText(sMsg);
+        txtmens.setEnabled(false);
+        simpleProgressBar.setVisibility(view.INVISIBLE);
+
+
+
+
+        builder.setView(view)
+
+                // Add action buttons
+                .setPositiveButton("Confirmar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int id) {
+                        isPolling = false;
+                        simpleProgressBar.setVisibility(view.INVISIBLE);
+
+                    }
+                })
+
+                .setNegativeButton("Voltar", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        isPolling = false;
+                        simpleProgressBar.setVisibility(view.INVISIBLE);
+
+                    }
+                });
+
+        builder.setCancelable(false);
+        AlertDialog alert = builder.create();
+        alert.show();
+        //mudar a cor do botao de confirmar
+        Button pbutton = alert.getButton(DialogInterface.BUTTON_POSITIVE);
+        //pbutton.setTextColor(Color.parseColor("#20910f"));
+
+
+
+        // Initially hide re-check button
+        btnRecheckPayment.setEnabled(false);
+
+        btngerpay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Spinner spinner = view.findViewById(R.id.spnFormas);
+                String stippag = spinner.getSelectedItem().toString();
+                if (stippag.equals("02 - PIX") && !isPolling) {
+                    pbutton.setVisibility(view.INVISIBLE);
+                    simpleProgressBar.setVisibility(view.VISIBLE);
+                    simpleProgressBar.setProgress(0);
+                    initiatePixPayment(view, txtPaymentStatus, imageViewQrCode, btnRecheckPayment, alert, iQtdtela);
+
+                }
+                if (stippag.equals("01 - VALE TRANSPORTE")) {
+                    String svalor = Guarda_valor;
+                    svalor = svalor.replace(",", "");
+                    svalor = svalor.replace(".", "");
+                    int ivalor = Integer.parseInt(svalor);
+                    String svalpay = Integer.toString(ivalor);
+                    openCamera(svalpay);
+                    alert.cancel();
+                }
+            }
+        });
+
+        //TODO Set up re-check button consultar pagamento somente!
+        btnRecheckPayment.setOnClickListener(v -> {
+            if (!isPolling) {
+                simpleProgressBar.setVisibility(view.VISIBLE);
+                simpleProgressBar.setProgress(0);
+                initiatePixPayment(view, txtPaymentStatus, imageViewQrCode, btnRecheckPayment, alert, iQtdtela);
+            }
+        });
+        sretmot = SmotivoWS;
+        return sretmot;
+
+    }
+
+    private void startPolling(ConsomeAPI_BAN client, String accessToken, String txid, Date qrCodeDate, TextView txtPaymentStatus, Button btnRecheckPayment, AlertDialog alert, int iqtd) {
+        ThreadPoolManager.getInstance().executeTask(() -> {
+            for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                try {
+                    String status = client.consultarPix(accessToken, txid, qrCodeDate);
+                    int secondsElapsed = attempt;
+                    runOnUiThread(() -> {
+                        if ("CONCLUIDA".equalsIgnoreCase(status)) {
+                            txtPaymentStatus.setText("Pagamento confirmado! TxID: " + txid);
+                            GuardaMobi = "PIX";
+                            GuardaID = txid;
+                            Inicia_Venda(iqtd);
+                            alert.dismiss();
+                            btnRecheckPayment.setEnabled(true);
+                            isPolling = false;
+                        } else {
+                            txtPaymentStatus.setText("Aguardando pagamento " + secondsElapsed + "s (Tentativa " + secondsElapsed + "/" + MAX_ATTEMPTS + ")");
+                            simpleProgressBar.setProgress(secondsElapsed);
+                        }
+                    });
+
+                    if ("CONCLUIDA".equalsIgnoreCase(status)) {
+                        break;
+                    }
+
+                    Thread.sleep(POLLING_INTERVAL_MS);
+
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        txtPaymentStatus.setText("Erro na consulta" + e.getMessage());
+                        btnRecheckPayment.setEnabled(true);
+                        isPolling = false;
+                    });
+                    e.printStackTrace();
+                    break;
+                }
+            }
+
+            runOnUiThread(() -> {
+                if (txtPaymentStatus.getText().toString().contains("Aguardando")) {
+                    txtPaymentStatus.setText("Máximo de tentativas atingido. Pagamento não confirmado.");
+                    btnRecheckPayment.setEnabled(true);
+                    isPolling = false;
+                }
+            });
+        });
     }
 
 
@@ -2078,7 +2315,7 @@ public class ViaActivity extends AppCompatActivity {
         // Spinner element
         final Spinner spinner = view.findViewById(R.id.spnPlaca);
         opcoes = new ArrayList<String>();
-        File sarquivo = new File(getExternalFilesDir("Download").getAbsolutePath() );
+        File sarquivo = new File(getExternalFilesDir("Download").getAbsolutePath());
         LinkedList<String> linhas = null;
 
         try {
@@ -2106,12 +2343,13 @@ public class ViaActivity extends AppCompatActivity {
         spinner.setSelection(adapterSpinner.getPosition(splaca));
 
 
-        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
             @Override
-            public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3){
+            public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
                 ((TextView) arg0.getChildAt(0)).setTextSize(24);
             }
+
             @Override
             public void onNothingSelected(AdapterView<?> arg0) {
                 ((TextView) arg0.getChildAt(0)).setTextSize(24);
@@ -2124,16 +2362,16 @@ public class ViaActivity extends AppCompatActivity {
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int id) {
-                         String splaca2 = spinner.getSelectedItem().toString();
-                         if (!splaca2.equals("") && !splaca2.equals(splaca)) {
-                             splaca2 = splaca2.replace("-", "");
-                             splaca2 = splaca2.replace(".", "");
-                             splaca2 = splaca2.replace("/", "");
-                             splaca2 = splaca2.toUpperCase();
-                             dbempvei.Atualizar_Campo_Emp("1", "Rsv002", splaca2);
+                        String splaca2 = spinner.getSelectedItem().toString();
+                        if (!splaca2.equals("") && !splaca2.equals(splaca)) {
+                            splaca2 = splaca2.replace("-", "");
+                            splaca2 = splaca2.replace(".", "");
+                            splaca2 = splaca2.replace("/", "");
+                            splaca2 = splaca2.toUpperCase();
+                            dbempvei.Atualizar_Campo_Emp("1", "Rsv002", splaca2);
 
 
-                         }
+                        }
 
                     }
                 });
@@ -2145,7 +2383,7 @@ public class ViaActivity extends AppCompatActivity {
         pbutton.setTextColor(Color.parseColor("#20910f"));
 
         sretmot = SmotivoWS;
-        return  sretmot;
+        return sretmot;
 
     }
 
@@ -2216,7 +2454,6 @@ public class ViaActivity extends AppCompatActivity {
         });
 
 
-
         ////Funcao que avisa quando o Seguro foi marcado ou desmarcado
         ckbSeguroc.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -2225,9 +2462,7 @@ public class ViaActivity extends AppCompatActivity {
 
                     Toast.makeText(ViaActivity.this, "O Valor do Seguro foi incluso.", Toast.LENGTH_LONG).show();
                     Confere_campos_DG(view);
-                }
-                else if (!ckbSeguroc.isChecked())
-                {
+                } else if (!ckbSeguroc.isChecked()) {
                     Toast.makeText(ViaActivity.this, "O Valor do Seguro foi retirado.", Toast.LENGTH_LONG).show();
                     Confere_campos_DG(view);
                 }
@@ -2371,12 +2606,9 @@ public class ViaActivity extends AppCompatActivity {
                         edtqtd.setText(sqtdcone);
 
 
-
                         if (ckbSeguroc.isChecked()) {
                             ckbseguro.setChecked(true);
-                        }
-                        else if (!ckbSeguroc.isChecked())
-                        {
+                        } else if (!ckbSeguroc.isChecked()) {
                             ckbseguro.setChecked(false);
                         }
 
@@ -2392,10 +2624,9 @@ public class ViaActivity extends AppCompatActivity {
         pbutton.setTextColor(Color.parseColor("#20910f"));
 
 
-        return  sretmot;
+        return sretmot;
 
     }
-
 
 
     public String Verifica_Pendentes() {
@@ -2411,17 +2642,17 @@ public class ViaActivity extends AppCompatActivity {
             if (stransf.equals("")) { //ainda nao transferiu para o servidor
                 String ssit = cursor.getSitbpe();
                 if (ssit.equals("CT") || ssit.equals("DG")) { //contingencia
-                    ipen = ipen+1;
+                    ipen = ipen + 1;
 
                 }
             }
 
         }
         if (ipen > 0) { //encontrou documentos pendentes de autorizacao
-            sretpen = ipen+" Bilhete(s) pendente(s).";
+            sretpen = ipen + " Bilhete(s) pendente(s).";
             iTotpendentes = ipen;
         }
-        return  sretpen;
+        return sretpen;
     }
 
     private Intent criarIntentBilhete(DB_BPE.BpeCursor cursore) {
@@ -2448,6 +2679,7 @@ public class ViaActivity extends AppCompatActivity {
         bundle.putString("MOTIVO", cursore.getRsv003());
         bundle.putString("CANCEL", cursore.getRsv001());
         bundle.putString("Activity_Dados", "14");
+        bundle.putString("AGENTE", cursore.getAgente());
         intent.putExtras(bundle);
         return intent;
     }
@@ -2517,16 +2749,13 @@ public class ViaActivity extends AppCompatActivity {
 
         sretaviso = Retpendentes;
 
-        return  sretaviso;
+        return sretaviso;
 
     }
 
 
-
-
-
     private void Menu_Lateral() {
-        String[] osArray = { "Bilhetes Emitidos", "Relatório de Vendas", "Configurações", "Encerrar Viagens", "Verificar Pendentes"};
+        String[] osArray = {"Bilhetes Emitidos", "Relatório de Vendas", "Configurações", "Encerrar Viagens", "Verificar Pendentes"};
         mAdapter = new ArrayAdapter<String>(ViaActivity.this, android.R.layout.simple_list_item_1, osArray);
         listMenu.setAdapter(mAdapter);
     }
@@ -2534,14 +2763,15 @@ public class ViaActivity extends AppCompatActivity {
     ActivityResultLauncher<Intent> resultadoActivity = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), new ActivityResultCallback<ActivityResult>() {
         @Override
         public void onActivityResult(ActivityResult result) {
-            if(result != null && result.getResultCode() == RESULT_OK) {
+            if (result != null && result.getResultCode() == RESULT_OK) {
                 if (result.getData() != null) {
                     Intent data = result.getData();
                     String sret = data.getStringExtra("msg");
                     String sorigemresult = data.getStringExtra("Activity_Dados");
-                    if (sorigemresult.equals("17")){
+                    int iqtd = GuardaQtd;
+                    if (sorigemresult.equals("17")) {
                         if (result.getResultCode() == RESULT_OK) {
-                            System.out.println("Retornei WSActivity Verificar Conexao: "+sret);
+                            System.out.println("Retornei WSActivity Verificar Conexao: " + sret);
                             if (sret.equals("Conectado")) {
                                 EstouConectado = true;
                             } else {
@@ -2551,7 +2781,7 @@ public class ViaActivity extends AppCompatActivity {
                         } else {
                             EstouConectado = false;
                         }
-                        System.out.println("Retorno do WS: "+EstouConectado);
+                        System.out.println("Retorno do WS: " + EstouConectado);
                         String scomando = WScomando;
                         DB_EMP dbemp = new DB_EMP(ViaActivity.this);
                         if (scomando.equals("CONSULTA")) {
@@ -2572,7 +2802,7 @@ public class ViaActivity extends AppCompatActivity {
                                 System.out.println("Gerei XML Activity_Dados: " + Activity_Dados);
                             }
                         }
-                        if (scomando.equals("BUSCAGRA")){
+                        if (scomando.equals("BUSCAGRA")) {
                             if (EstouConectado) {
                                 dbemp.Atualizar_Campo_Emp("1", "Tipemi", "1");
                                 dbemp.Atualizar_Campo_Emp("1", "Datctg", "");
@@ -2580,6 +2810,15 @@ public class ViaActivity extends AppCompatActivity {
                                 System.out.println("Gerei XML Activity_Dados: " + Activity_Dados);
                             }
                         }
+                        if(scomando.equals("VERIFICA_CONEXAO")){
+                            if (EstouConectado){
+                                String spag =  infPagamento("Informe a Forma de Pagamento", iqtd);
+                            }else{
+                                String spag =  infPagamento("Informe a Forma de Pagamento", iqtd);
+                                //Revisar para funcionar carteira digitalinfMensagens("Sem conexão com internet\nFavor verificar.", "");
+                            }
+                        }
+
                     }
                 }
             }
@@ -2591,619 +2830,682 @@ public class ViaActivity extends AppCompatActivity {
     ActivityResultLauncher<Intent> startForresult = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         System.out.println("startForresult chamado com resultado: " + (result != null ? result.getResultCode() : "null"));
         if (result != null && result.getData() != null) {
-                    Intent data = result.getData();
-                    String sorigemresult = "";
-                    String sret = "";
-                    int iActivity_Dados = Activity_Dados;
-                    if (iActivity_Dados == 104) {
-                        String szxing = data.getAction();
-                        if (szxing.equals("com.google.zxing.client.android.SCAN")) {
-                            sorigemresult = "104";
+            Intent data = result.getData();
+            String sorigemresult = "";
+            String sret = "";
+            int iActivity_Dados = Activity_Dados;
+            if (iActivity_Dados == 104) {
+                String szxing = data.getAction();
+                if (szxing.equals("com.google.zxing.client.android.SCAN")) {
+                    sorigemresult = "104";
+                }
+            } else {
+                sret = data.getStringExtra("msg");
+                sorigemresult = data.getStringExtra("Activity_Dados");
+            }
+
+            System.out.println("Entrei na startForresult " + "Retorno: " + sorigemresult);
+
+            DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+            String smodimp = dbemp.Busca_Dados_Emp(1, "Modimp");
+            if (sorigemresult.equals("1")) {
+
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    // mostra hint
+                    //Toast.makeText(this, "Viagem: " + msg, Toast.LENGTH_LONG).show();
+                    EditText edtViagem = findViewById(R.id.edtVia);
+                    edtViagem.setText(sret);
+                    EditText edtOrigem = findViewById(R.id.edtOrigem);
+                    EditText edtDestino = findViewById(R.id.edtDestino);
+                    EditText edtcad = findViewById(R.id.edtPoltrona);
+                    TextView txtTarifa = findViewById(R.id.txtValor);
+                    CheckBox ckbSeguro = findViewById(R.id.ckbSeguro);
+                    ckbSeguro.setChecked(true);
+                    edtOrigem.setText("Selecione a Origem");
+                    edtDestino.setText("Selecione o Destino");
+                    txtTarifa.setText("0.00");
+                    edtcad.setText("");
+                } else {
+                    Confere_campos();
+                }
+            }
+            // se o resultado retornou a Origem
+            if (sorigemresult.equals("2")) {
+                if (result.getResultCode() == RESULT_OK) {
+                    EditText edtOrigem = findViewById(R.id.edtOrigem);
+                    edtOrigem.setText(sret);
+                    Confere_campos();
+                } else {
+                    Confere_campos();
+                }
+            }
+            // se o resultado retornou o Destino
+            if (sorigemresult.equals("3")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    EditText edtDestino = findViewById(R.id.edtDestino);
+                    edtDestino.setText(sret);
+                    Confere_campos();
+
+                } else {
+                    Confere_campos();
+                }
+
+            }
+            if (sorigemresult.equals("5")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    EditText edtDestino = findViewById(R.id.edtDestino);
+                    edtDestino.setText(sret);
+                    Confere_campos();
+
+                } else {
+                    Confere_campos();
+                }
+
+            }
+
+            // se o resultado retornou do WS
+            if (sorigemresult.equals("12") || sorigemresult.equals("14")) {
+                String sfimCONEXAO;
+                sfimCONEXAO = "";
+                String resultado = "";
+
+                if (result.getResultCode() == RESULT_OK) {
+                    if (sorigemresult.equals("12")) {
+                        String sdatchamada = Funcoes_Android.getCurrentUTC();
+                        System.out.println(sdatchamada + "Retornei Transmissao Normal:");
+                        String sdathoratu = HoraInicio;
+                        String sdathoratu2 = Funcoes_Android.getCurrentUTC();
+                        String shorfin = sdathoratu2.substring(11, 19); //hora atual
+                        String shorini = sdathoratu.substring(11, 19); //hora anterior
+
+                        //Verifica se a transmissao demorou mais de 1 minuto
+                        long intervalo = Funcoes_Android.validaDate_Seg(shorini, shorfin);
+                        System.out.println(sdatchamada + "Demorei x segundos:" + shorini + "   " + shorfin + " = " + intervalo);
+                        if (intervalo > 10) {
+                            //Habilia a contingência
+                            dbemp.Atualizar_Campo_Emp("1", "Tipemi", "2");
+                            dbemp.Atualizar_Campo_Emp("1", "Datctg", sdathoratu2);
+                            // String inf = infMensagens("Contingência Ativada.");
                         }
-                    } else {
-                        sret = data.getStringExtra("msg");
-                        sorigemresult = data.getStringExtra("Activity_Dados");
-                    }
-
-                    System.out.println("Entrei na startForresult " + "Retorno: "+sorigemresult);
-
-                    DB_EMP dbemp = new DB_EMP(ViaActivity.this);
-                    String smodimp = dbemp.Busca_Dados_Emp(1, "Modimp");
-                    if (sorigemresult.equals("1")) {
-
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            // mostra hint
-                            //Toast.makeText(this, "Viagem: " + msg, Toast.LENGTH_LONG).show();
-                            EditText edtViagem = findViewById(R.id.edtVia);
-                            edtViagem.setText(sret);
-                            EditText edtOrigem = findViewById(R.id.edtOrigem);
-                            EditText edtDestino = findViewById(R.id.edtDestino);
-                            EditText edtcad = findViewById(R.id.edtPoltrona);
-                            TextView txtTarifa = findViewById(R.id.txtValor);
-                            CheckBox ckbSeguro = findViewById(R.id.ckbSeguro);
-                            ckbSeguro.setChecked(true);
-                            edtOrigem.setText("Selecione a Origem");
-                            edtDestino.setText("Selecione o Destino");
-                            txtTarifa.setText("0.00");
-                            edtcad.setText("");
-                        } else {
-                            Confere_campos();
-                        }
-                    }
-                    // se o resultado retornou a Origem
-                    if (sorigemresult.equals("2")) {
-                        if (result.getResultCode() == RESULT_OK) {
-                            EditText edtOrigem = findViewById(R.id.edtOrigem);
-                            edtOrigem.setText(sret);
-                            Confere_campos();
-                        } else {
-                            Confere_campos();
-                        }
-                    }
-                    // se o resultado retornou o Destino
-                    if (sorigemresult.equals("3")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            EditText edtDestino = findViewById(R.id.edtDestino);
-                            edtDestino.setText(sret);
-                            Confere_campos();
-
-                        } else {
-                            Confere_campos();
-                        }
-
-                    }
-                    if (sorigemresult.equals("5")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            EditText edtDestino = findViewById(R.id.edtDestino);
-                            edtDestino.setText(sret);
-                            Confere_campos();
-
-                        } else {
-                            Confere_campos();
-                        }
-
-                    }
-
-                    // se o resultado retornou do WS
-                    if (sorigemresult.equals("12") || sorigemresult.equals("14")) {
-                        String sfimCONEXAO;
-                        sfimCONEXAO = "";
-                        String resultado = "";
-
-                        if (result.getResultCode() == RESULT_OK) {
-                            if (sorigemresult.equals("12")) {
-                                String sdatchamada = Funcoes_Android.getCurrentUTC();
-                                System.out.println(sdatchamada + "Retornei Transmissao Normal:");
-                                String sdathoratu = HoraInicio;
-                                String sdathoratu2 = Funcoes_Android.getCurrentUTC();
-                                String shorfin = sdathoratu2.substring(11, 19); //hora atual
-                                String shorini = sdathoratu.substring(11, 19); //hora anterior
-
-                                //Verifica se a transmissao demorou mais de 1 minuto
-                                long intervalo = Funcoes_Android.validaDate_Seg(shorini, shorfin);
-                                System.out.println(sdatchamada + "Demorei x segundos:" + shorini + "   " + shorfin + " = " + intervalo);
-                                if (intervalo > 10) {
-                                    //Habilia a contingência
-                                    dbemp.Atualizar_Campo_Emp("1", "Tipemi", "2");
-                                    dbemp.Atualizar_Campo_Emp("1", "Datctg", sdathoratu2);
-                                    // String inf = infMensagens("Contingência Ativada.");
-                                }
-                                if (smodimp.equals("01")) {
-                                    Imprime_BPe(); //SUNMI
-                                    int iqtd = GuardaQtd;
-                                    if (iqtd > 1) {
-                                        iqtd = (iqtd - 1);
-                                        GuardaQtd = iqtd;
-                                        Chama_Fechamento();
-                                    } else {
-                                        sfimCONEXAO = "S";
-                                    }
-                                } else if (smodimp.equals("02")) {
-                                    Imprime_BPe_Lio(); //CIELO LIO
-                                    int iqtd = GuardaQtd;
-                                    if (iqtd == 1) {
-                                        GuardaPagto = "";
-                                        GuardaMobi = "";
-                                        GuardaBand = "";
-                                        GuardaAut = "";
-                                        GuardaID = "";
-                                        Guarda_QRcode = "";
-                                        sfimCONEXAO = "S";
-                                    } else {
-                                        if (iqtd > 1) {
-                                            iqtd = (iqtd - 1);
-                                            GuardaQtd = iqtd;
-                                            Chama_Fechamento();
-                                        }
-                                    }
-                                } else if (smodimp.equals("03")) {
-                                    Imprime_BPe_BT(); //ARNY SP5 Bluetooth
-                                    int iqtd = GuardaQtd;
-                                    if (iqtd > 1) {
-                                        iqtd = (iqtd - 1);
-                                        GuardaQtd = iqtd;
-                                        Chama_Fechamento();
-                                    } else {
-                                        sfimCONEXAO = "S";
-                                        GuardaMobi = "";
-                                        Guarda_QRcode = "";
-                                    }
-                                } else if (smodimp.equals("05")) {
-                                    Imprime_BPe_DTS(); //AR-2500 Bluetooth
-                                    int iqtd = GuardaQtd;
-                                    if (iqtd > 1) {
-                                        iqtd = (iqtd - 1);
-                                        GuardaQtd = iqtd;
-                                        Chama_Fechamento();
-                                    } else {
-                                        sfimCONEXAO = "S";
-                                        GuardaMobi = "";
-                                        Guarda_QRcode = "";
-                                    }
-                                }
-                                EditText edtCad = findViewById(R.id.edtPoltrona); //Poltrona
-                                EditText edtNomPas = findViewById(R.id.edtNomePas); //nome do passageiro
-                                EditText edtDocPas = findViewById(R.id.edtDocPas); //documento de Identidade do passageiro
-                                EditText edtcpfpas = findViewById(R.id.edtCPFPas); //CPF do Passageiro Opcional
-                                EditText edttipgra = findViewById(R.id.edtTipGra); //Tipo de Gratuidade do passageiro
-                                EditText edttipdes = findViewById(R.id.edtTipDes); //Tipo de desconto (100 ou 50%)
-                                EditText edtvia = findViewById(R.id.edtVia);
-                                EditText edtori = findViewById(R.id.edtOrigem);
-                                EditText edtdes = findViewById(R.id.edtDestino);
-                                edtCad.setText("");
-                                edtNomPas.setText("");
-                                edtDocPas.setText("");
-                                edtcpfpas.setText("");
-                                edttipgra.setText("");
-                                edttipdes.setText("");
-                                if (EnviaConexao.equals("S")) {
-                                    if (sfimCONEXAO.equals("S")) {
-                                        edtvia.setText(GuardaVia);
-                                        edtori.setText(GuardaOri);
-                                        edtdes.setText(GuardaDes);
-                                        Linha_Trab = GuardaLinha;
-                                        Calcula_Valor_DB();
-                                        EnviaConexao = "";
-                                    }
-                                }
-                                Menu_Lateral();
-
-
-                            } //transmissao em tempo real
-                            if (sorigemresult.equals("14")) {
-                                String xml = data.getStringExtra("XML"); // Pegamos o XML retornado
-                                String snumero = (xml != null && xml.length() >= 34) ? xml.substring(25, 34) : "unknown";
-                                if (result.getResultCode() == RESULT_OK) {
-                                    RetWSActivity = sret;
-                                    resultado = snumero + " - " + sret;
-                                    System.out.println(Funcoes_Android.getCurrentUTC() + " Retornei Transmissao de Pendentes: " + resultado);
-                                } else {
-                                    RetWSActivity = "Erro: " + sret;
-                                    resultado = snumero + " - Erro: " + sret;
-                                    System.out.println(Funcoes_Android.getCurrentUTC() + " Retornei Transmissao Pendentes Erro: " + resultado);
-                                }
-                                synchronized (msgBuilder) {
-                                    msgBuilder.append(resultado).append("\n");
-                                    iPendentes++;
-                                    System.out.println("Bilhete " + snumero + " concluído com resultado: " + resultado);
-                                    System.out.println("Totpen: " + iTotpendentes + " ipen: " + iPendentes);
-
-                                    runOnUiThread(() -> {
-                                       // progressText.setText("Processando: " + iPendentes + "/" + iTotpendentes);
-                                        if (iPendentes == iTotpendentes) {
-                                            MsgAgrupa = msgBuilder.toString();
-                                            System.out.println("Exibindo mensagem final: " + MsgAgrupa);
-                                            infMensagens(MsgAgrupa, "");
-                                         //   progressText.setText("Concluído!");
-                                        } else {
-                                            // Envia o próximo bilhete após o retorno do anterior
-                                            enviarProximoBilhete();
-                                        }
-                                    });
-                                }
-                            }
-                        } else {
-                            System.out.println("Erro: Resultado ou data é null no startForresult");
-                            // Se houver erro, tenta enviar o próximo bilhete
-                            runOnUiThread(this::enviarProximoBilhete);
-                        }
-                        if (result.getResultCode() == RESULT_CANCELED) {
-                            ///Nao conseguiu transmitir chamar novo bilhete em contingencia
-                            if (sorigemresult.equals("12")) {
-                                //Verificar se o BP-e realmente nao foi autorizado
-                                String chaveBPe = Guarda_Texto;
-                                String snumbpe = chaveBPe.substring(25, 34);
-                                int inumbpe = Integer.parseInt(snumbpe);
-                                DB_BPE dbbpe = new DB_BPE(getApplicationContext());
-                                String ssit = dbbpe.Busca_Dados_Bpe(Integer.toString(inumbpe), "Sitbpe");
-                                EditText edtCad = findViewById(R.id.edtPoltrona); //Poltrona
-                                EditText edtNomPas = findViewById(R.id.edtNomePas); //nome do passageiro
-                                EditText edtDocPas = findViewById(R.id.edtDocPas); //documento de Identidade do passageiro
-                                EditText edtcpfpas = findViewById(R.id.edtCPFPas); //CPF do Passageiro Opcional
-                                EditText edttipgra = findViewById(R.id.edtTipGra); //Tipo de Gratuidade do passageiro
-                                EditText edttipdes = findViewById(R.id.edtTipDes); //Tipo de desconto (100 ou 50%)
-                                EditText edtvia = findViewById(R.id.edtVia);
-                                EditText edtori = findViewById(R.id.edtOrigem);
-                                EditText edtdes = findViewById(R.id.edtDestino);
-                                if (!ssit.equals("BA")) {
-                                    String sdatchamada = Funcoes_Android.getCurrentUTC();
-                                    System.out.println(sdatchamada + "Retornei TRansmissao Normal Erro:");
-                                    //infMensagens(msg);
-                                    Gerar_XML("E");
-                                    int iqtd = GuardaQtd;
-                                    if (iqtd == 1) {
-                                        GuardaPagto = "";
-                                        GuardaBand = "";
-                                        GuardaAut = "";
-                                        GuardaID = "";
-                                        GuardaMobi = "";
-                                        sfimCONEXAO = "S";
-                                        Guarda_QRcode = "";
-                                    } else {
-                                        if (iqtd > 1) {
-                                            iqtd = (iqtd - 1);
-                                            GuardaQtd = iqtd;
-                                            Chama_Fechamento();
-                                        }
-                                    }
-                                    Menu_Lateral();
-                                } else {
-                                    if (smodimp.equals("01")) {
-                                        Imprime_BPe(); //SUNMI
-                                        int iqtd = GuardaQtd;
-                                        if (iqtd > 1) {
-                                            iqtd = (iqtd - 1);
-                                            GuardaQtd = iqtd;
-                                            Chama_Fechamento();
-                                        }
-                                    } else if (smodimp.equals("03")) {
-                                        Imprime_BPe_BT(); //ARNY SP5 Bluetooth
-                                        int iqtd = GuardaQtd;
-                                        if (iqtd > 1) {
-                                            iqtd = (iqtd - 1);
-                                            GuardaQtd = iqtd;
-                                            Chama_Fechamento();
-                                        }
-                                    } else if (smodimp.equals("05")) {
-                                        Imprime_BPe_DTS(); //ARNY SP5 Bluetooth
-                                        int iqtd = GuardaQtd;
-                                        if (iqtd > 1) {
-                                            iqtd = (iqtd - 1);
-                                            GuardaQtd = iqtd;
-                                            Chama_Fechamento();
-                                        }
-                                    } else {
-                                        Imprime_BPe_Lio(); //CIELO LIO
-                                        int iqtd = GuardaQtd;
-                                        if (iqtd == 1) {
-                                            GuardaPagto = "";
-                                            GuardaBand = "";
-                                            GuardaAut = "";
-                                            GuardaID = "";
-                                            sfimCONEXAO = "S";
-                                        } else {
-                                            if (iqtd > 1) {
-                                                iqtd = (iqtd - 1);
-                                                GuardaQtd = iqtd;
-                                                Chama_Fechamento();
-                                            }
-                                        }
-                                    }
-                                    edtCad.setText("");
-                                    edtNomPas.setText("");
-                                    edtDocPas.setText("");
-                                    edtcpfpas.setText("");
-                                    edttipgra.setText("");
-                                    edttipdes.setText("");
-                                    if (EnviaConexao.equals("S")) {
-                                        if (sfimCONEXAO.equals("S")) {
-                                            edtvia.setText(GuardaVia);
-                                            edtori.setText(GuardaOri);
-                                            edtdes.setText(GuardaDes);
-                                            Linha_Trab = GuardaLinha;
-                                            Calcula_Valor_DB();
-                                            EnviaConexao = "";
-                                            Menu_Lateral();
-                                        }
-                                    }
-                                }
-
-
-                            }
-                            if (sorigemresult.equals("14")) {
-                                synchronized (msgBuilder) {
-                                    msgBuilder.append(resultado).append("\n");
-                                    iPendentes++;
-                                    System.out.println("concluído com resultado: " + resultado);
-                                    System.out.println("Totpen: " + iTotpendentes + " ipen: " + iPendentes);
-
-                                    runOnUiThread(() -> {
-                                        // progressText.setText("Processando: " + iPendentes + "/" + iTotpendentes);
-                                        if (iPendentes == iTotpendentes) {
-                                            MsgAgrupa = msgBuilder.toString();
-                                            System.out.println("Exibindo mensagem final: " + MsgAgrupa);
-                                            infMensagens(MsgAgrupa, "");
-                                            //   progressText.setText("Concluído!");
-                                        } else {
-                                            // Envia o próximo bilhete após o retorno do anterior
-                                            enviarProximoBilhete();
-                                        }
-                                    });
-                                }
-                            }
-
-                        }
-
-                    }
-
-
-                    // se o resultado retornou do WS cancelamento
-                    if (sorigemresult.equals("13")) {
-                        if (result.getResultCode() == RESULT_OK) {
-                            String snumero = data.getStringExtra("numbpe");
-                            if (!snumero.equals("")) {
-                                if (smodimp.equals("01")) {
-                                    Imprime_Cancel(snumero); //SUNMI
-                                } else if (smodimp.equals("02")) {
-                                    Imprime_Cancel_LIO(snumero); //CIELO LIO
-                                } else if (smodimp.equals("03")) {
-                                    Imprime_Cancel_BT(snumero); //ARNY
-                                }
-                            }
-                            infMensagens("Bilhete Cancelado com Sucesso!", "");
-                        }
-
-                        if (result.getResultCode() == RESULT_CANCELED) {
-                            //Toast.makeText(this, "Erro: " + msg, Toast.LENGTH_LONG).show();
-                            ///Nao conseguiu cancelar
-                            infMensagens(sret, "");
-
-                        }
-
-
-                    }
-
-                    // se o resultado retornou da tela de parametros
-                    if (sorigemresult.equals("15")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            Menu_Lateral();
-
-                        }
-
-                    }
-                    // se o resultado retornou do verifica conexao
-                    if (sorigemresult.equals("17")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-                            System.out.println("Retornei WSActivity Verificar Conexao: "+sret);
-                            if (sret.equals("Conectado")) {
-                                EstouConectado = true;
+                        if (smodimp.equals("01")) {
+                            Imprime_BPe(); //SUNMI
+                            int iqtd = GuardaQtd;
+                            if (iqtd > 1) {
+                                iqtd = (iqtd - 1);
+                                GuardaQtd = iqtd;
+                                Chama_Fechamento();
                             } else {
-                                EstouConectado = false;
+                                sfimCONEXAO = "S";
                             }
-
-                        } else {
-                            EstouConectado = false;
-                        }
-
-                    }
-                    // se o resultado retornou do verifica gratuidade
-                    if (sorigemresult.equals("21")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-                            Intent Newintent = getIntent();
-                            Bundle bundle = Newintent.getExtras();
-                            String susrgra = bundle.getString("NomeUSR");
-                            String sdocgra = bundle.getString("DocUSR");
-                            String stipogra = bundle.getString("TipoUSR");
-                            System.out.println("Retornei Verificar Gratuidade: "+sret);
-
-
-                        }
-
-                    }
-                    if (sorigemresult.equals("22")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-                            Intent Newintent = getIntent();
-                            Bundle bundle = Newintent.getExtras();
-                            String susrgra = bundle.getString("NomeUSR");
-                            String sdocgra = bundle.getString("DocUSR");
-                            String stipogra = bundle.getString("TipoUSR");
-                            System.out.println("Retornei Verificar Gratuidade: "+sret);
-                            int iqtdret = Integer.parseInt(sret);
-                            if (iqtdret>=2) {
-                                infMensagens("Usuario excedeu limite para esta linha no mês.", "");
-                                EditText edtpas = findViewById(R.id.edtNomePas);
-                                EditText edtdoc = findViewById(R.id.edtDocPas);
-                                EditText edtcpfpas = findViewById(R.id.edtCPFPas);
-                                EditText edttipgra = findViewById(R.id.edtTipGra);
-                                EditText edttipdes = findViewById(R.id.edtTipDes);
-                                edtpas.setText("");
-                                edtdoc.setText("");
-                                edtcpfpas.setText("");
-                                edttipgra.setText("");
-                                edttipdes.setText("");
-                                TipoDoc = "";
-                            }
-                            Calcula_Valor_DB();
-
-                        }
-
-                    }
-
-                    //retornou Linha de conexao
-                    if (sorigemresult.equals("100")) {
-                        EditText edtlinhac = viewConexao.findViewById(R.id.edtLinhac);
-                        EditText edtViagem = viewConexao.findViewById(R.id.edtViac);
-                        EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
-                        EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
-                        TextView txtTarifa = viewConexao.findViewById(R.id.txtValorc);
-                        CheckBox ckbSeguro = viewConexao.findViewById(R.id.ckbSeguroc);
-                        TextView txtvalortot = viewConexao.findViewById(R.id.txtValortot);
-
-                        if (result.getResultCode() == RESULT_OK) {
-                            edtlinhac.setText(sret);
-                            ckbSeguro.setChecked(true);
-                            edtViagem.setText("Selecione a Viagem");
-                            edtOrigem.setText("Selecione a Origem");
-                            edtDestino.setText("Selecione o Destino");
-                            txtTarifa.setText("0.00");
-                            String stotal = String.format("%.2f", GuardaValor);
-                            txtvalortot.setText(stotal);
-                        } else {
-                            edtlinhac.setText("Selecione a Linha");
-                            ckbSeguro.setChecked(true);
-                            edtViagem.setText("Selecione a Viagem");
-                            edtOrigem.setText("Selecione a Origem");
-                            edtDestino.setText("Selecione o Destino");
-                            txtTarifa.setText("0.00");
-                            String stotal = String.format("%.2f", GuardaValor);
-                            txtvalortot.setText(stotal);
-                        }
-
-                    } //
-
-                    //retornou viagem de conexao
-                    if (sorigemresult.equals("101")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            EditText edtViagem = viewConexao.findViewById(R.id.edtViac);
-                            edtViagem.setText(sret);
-                            EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
-                            EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
-                            TextView txtTarifa = viewConexao.findViewById(R.id.txtValorc);
-                            CheckBox ckbSeguro = viewConexao.findViewById(R.id.ckbSeguroc);
-                            ckbSeguro.setChecked(true);
-                            edtOrigem.setText("Selecione a Origem");
-                            edtDestino.setText("Selecione o Destino");
-                            txtTarifa.setText("0.00");
-                        }
-
-                    } //101
-
-                    // se o resultado retornou a Origem da conexao
-                    if (sorigemresult.equals("102")) {
-
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            // mostra hint
-                            //Toast.makeText(this, "Origem: " + msg, Toast.LENGTH_LONG).show();
-                            EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
-                            edtOrigem.setText(sret);
-                            Confere_campos_DG(viewConexao);
-                        } else {
-                            Confere_campos_DG(viewConexao);
-                        }
-
-
-                    }
-                    // se o resultado retornou o Destino da conexao
-                    if (sorigemresult.equals("103")) {
-                        if (result.getResultCode() == RESULT_OK) {
-
-                            // mostra hint
-                            //Toast.makeText(this, "Destino: " + msg, Toast.LENGTH_LONG).show();
-                            EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
-                            edtDestino.setText(sret);
-                            Confere_campos_DG(viewConexao);
-
-                        } else {
-                            Confere_campos_DG(viewConexao);
-                        }
-
-                    }
-                    //Se retornou leitura da camera
-                    if (sorigemresult.equals("104")) {
-                        if (result.getResultCode() == RESULT_OK) {
-                            String contents = data.getStringExtra("SCAN_RESULT");
-                            String value = contents;
-                            Guarda_QRcode = value;
-                            dbemp.Atualizar_Campo_Emp("1", "Ultqrc", value);
-                            //Toast.makeText(getApplicationContext(), contents, Toast.LENGTH_LONG).show();
-                            Log.i("CONTENT SCAN ", contents);
-                            Log.i("CONTENT VALUE", value);
-                            if (!value.equals("")) {
-
-                                //DB_EMP dbempvenda = new DB_EMP(ViaActivity.this);
-                                //String sqrc = dbempvenda.Busca_Dados_Emp(1, "Ultqrc");
-                                Log.i(TAG, "Retorno Leitura: " + value);
-                                if (!value.equals("")) {
-
-                                    EditText edtVia = findViewById(R.id.edtVia);
-                                    String sser = dbemp.Busca_Dados_Emp(1, "Serie");
-                                    String svia = edtVia.getText().toString();
-                                    TextView txtTarifa = findViewById(R.id.txtValor);
-                                    String svalor = txtTarifa.getText().toString();
-                                    svalor = svalor.replace(",", "");
-                                    com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.getInstance().chargePassenger(ViaActivity.this, svalor, value, sser, svia, new OnboardCallback<MobiPixResponseDTO<ChargeRiderResponseDTO>>() {
-                                        @Override
-                                        public void onSuccess(MobiPixResponseDTO<ChargeRiderResponseDTO> response) {
-                                            // processar a logica de sucesso
-                                            int istatus = response.getStatus();
-                                            Log.i(TAG, "callbackpay PAS: " + istatus);
-                                            if (istatus == 200) {
-                                                ChargeRiderResponseDTO responsechar = ChargeRiderResponseDTO.class.cast(response.getResponse());
-
-                                                LocalTransactionStatus retstatus = responsechar.getLocalTransactionStatus();
-                                                String status = retstatus.toString();
-                                                //infMensagens(status, "");
-                                                if (status.equals("AUTHORIZED")) {
-                                                    //Salvar a forma de pagamento
-                                                    GuardaMobi = "VALE TRANSPORTE";
-                                                    GuardaID = responsechar.getLocalAuthCode();
-                                                    Inicia_Venda();
-                                                } else {
-                                                    String retresponse = responsechar.getMessage();
-                                                    infMensagens(retresponse, "");
-                                                }
-
-
-                                            }
-
-                                        }
-
-                                        @Override
-                                        public void onError(MobiPixResponseDTO<ChargeRiderResponseDTO> response) {
-                                            // processar a logica de erro
-                                            String serro = "ERRO";
-                                            int istatus = response.getStatus();
-                                            if (istatus == 400) {
-                                                serro = "Requisição inválida";
-                                            } else if (istatus == 401) {
-                                                serro = "Usuário não autorizado";
-                                            } else if (istatus == 500) {
-                                                serro = "Erro no servidor do App";
-                                            } else {
-                                                serro = response.getMessageKey();
-                                            }
-                                            infMensagens(response.getStatus() + " = " + serro, "");
-
-                                        }
-                                    });
-
-
+                        } else if (smodimp.equals("02")) {
+                            Imprime_BPe_Lio(); //CIELO LIO
+                            int iqtd = GuardaQtd;
+                            if (iqtd == 1) {
+                                GuardaPagto = "";
+                                GuardaMobi = "";
+                                GuardaBand = "";
+                                GuardaAut = "";
+                                GuardaID = "";
+                                Guarda_QRcode = "";
+                                sfimCONEXAO = "S";
+                            } else {
+                                if (iqtd > 1) {
+                                    iqtd = (iqtd - 1);
+                                    GuardaQtd = iqtd;
+                                    Chama_Fechamento();
                                 }
                             }
-                    } else if (result.getResultCode() == Activity.RESULT_CANCELED) {
-                        // Handle cancel
+                        } else if (smodimp.equals("03")) {
+                            Imprime_BPe_BT(); //ARNY SP5 Bluetooth
+                            int iqtd = GuardaQtd;
+                            if (iqtd > 1) {
+                                iqtd = (iqtd - 1);
+                                GuardaQtd = iqtd;
+                                Chama_Fechamento();
+                            } else {
+                                sfimCONEXAO = "S";
+                                GuardaMobi = "";
+                                Guarda_QRcode = "";
+                            }
+                        } else if (smodimp.equals("05")) {
+                            Imprime_BPe_DTS(); //AR-2500 Bluetooth
+                            int iqtd = GuardaQtd;
+                            if (iqtd > 1) {
+                                iqtd = (iqtd - 1);
+                                GuardaQtd = iqtd;
+                                Chama_Fechamento();
+                            } else {
+                                sfimCONEXAO = "S";
+                                GuardaMobi = "";
+                                Guarda_QRcode = "";
+                            }
+                        }
+                        EditText edtCad = findViewById(R.id.edtPoltrona); //Poltrona
+                        EditText edtNomPas = findViewById(R.id.edtNomePas); //nome do passageiro
+                        EditText edtDocPas = findViewById(R.id.edtDocPas); //documento de Identidade do passageiro
+                        EditText edtcpfpas = findViewById(R.id.edtCPFPas); //CPF do Passageiro Opcional
+                        EditText edttipgra = findViewById(R.id.edtTipGra); //Tipo de Gratuidade do passageiro
+                        EditText edttipdes = findViewById(R.id.edtTipDes); //Tipo de desconto (100 ou 50%)
+                        EditText edtvia = findViewById(R.id.edtVia);
+                        EditText edtori = findViewById(R.id.edtOrigem);
+                        EditText edtdes = findViewById(R.id.edtDestino);
+                        edtCad.setText("");
+                        edtNomPas.setText("");
+                        edtDocPas.setText("");
+                        edtcpfpas.setText("");
+                        edttipgra.setText("");
+                        edttipdes.setText("");
+                        if (EnviaConexao.equals("S")) {
+                            if (sfimCONEXAO.equals("S")) {
+                                edtvia.setText(GuardaVia);
+                                edtori.setText(GuardaOri);
+                                edtdes.setText(GuardaDes);
+                                Linha_Trab = GuardaLinha;
+                                Calcula_Valor_DB();
+                                EnviaConexao = "";
+                            }
+                        }
+                        Menu_Lateral();
+
+
+                    } //transmissao em tempo real
+                    if (sorigemresult.equals("14")) {
+                        String xml = data.getStringExtra("XML"); // Pegamos o XML retornado
+                        String snumero = (xml != null && xml.length() >= 34) ? xml.substring(25, 34) : "unknown";
+                        if (result.getResultCode() == RESULT_OK) {
+                            RetWSActivity = sret;
+                            resultado = snumero + " - " + sret;
+                            System.out.println(Funcoes_Android.getCurrentUTC() + " Retornei Transmissao de Pendentes: " + resultado);
+                        } else {
+                            RetWSActivity = "Erro: " + sret;
+                            resultado = snumero + " - Erro: " + sret;
+                            System.out.println(Funcoes_Android.getCurrentUTC() + " Retornei Transmissao Pendentes Erro: " + resultado);
+                        }
+                        synchronized (msgBuilder) {
+                            msgBuilder.append(resultado).append("\n");
+                            iPendentes++;
+                            System.out.println("Bilhete " + snumero + " concluído com resultado: " + resultado);
+                            System.out.println("Totpen: " + iTotpendentes + " ipen: " + iPendentes);
+
+                            runOnUiThread(() -> {
+                                // progressText.setText("Processando: " + iPendentes + "/" + iTotpendentes);
+                                if (iPendentes == iTotpendentes) {
+                                    MsgAgrupa = msgBuilder.toString();
+                                    System.out.println("Exibindo mensagem final: " + MsgAgrupa);
+                                    infMensagens(MsgAgrupa, "");
+                                    //   progressText.setText("Concluído!");
+                                } else {
+                                    // Envia o próximo bilhete após o retorno do anterior
+                                    enviarProximoBilhete();
+                                }
+                            });
+                        }
                     }
+                } else {
+                    System.out.println("Erro: Resultado ou data é null no startForresult");
+                    // Se houver erro, tenta enviar o próximo bilhete
+                    runOnUiThread(this::enviarProximoBilhete);
+                }
+                if (result.getResultCode() == RESULT_CANCELED) {
+                    ///Nao conseguiu transmitir chamar novo bilhete em contingencia
+                    if (sorigemresult.equals("12")) {
+                        //Verificar se o BP-e realmente nao foi autorizado
+                        String chaveBPe = Guarda_Texto;
+                        String snumbpe = chaveBPe.substring(25, 34);
+                        int inumbpe = Integer.parseInt(snumbpe);
+                        DB_BPE dbbpe = new DB_BPE(getApplicationContext());
+                        String ssit = dbbpe.Busca_Dados_Bpe(Integer.toString(inumbpe), "Sitbpe");
+                        EditText edtCad = findViewById(R.id.edtPoltrona); //Poltrona
+                        EditText edtNomPas = findViewById(R.id.edtNomePas); //nome do passageiro
+                        EditText edtDocPas = findViewById(R.id.edtDocPas); //documento de Identidade do passageiro
+                        EditText edtcpfpas = findViewById(R.id.edtCPFPas); //CPF do Passageiro Opcional
+                        EditText edttipgra = findViewById(R.id.edtTipGra); //Tipo de Gratuidade do passageiro
+                        EditText edttipdes = findViewById(R.id.edtTipDes); //Tipo de desconto (100 ou 50%)
+                        EditText edtvia = findViewById(R.id.edtVia);
+                        EditText edtori = findViewById(R.id.edtOrigem);
+                        EditText edtdes = findViewById(R.id.edtDestino);
+                        if (!ssit.equals("BA")) {
+                            String sdatchamada = Funcoes_Android.getCurrentUTC();
+                            System.out.println(sdatchamada + "Retornei TRansmissao Normal Erro:");
+                            //infMensagens(msg);
+                            Gerar_XML("E");
+                            int iqtd = GuardaQtd;
+                            if (iqtd == 1) {
+                                GuardaPagto = "";
+                                GuardaBand = "";
+                                GuardaAut = "";
+                                GuardaID = "";
+                                GuardaMobi = "";
+                                sfimCONEXAO = "S";
+                                Guarda_QRcode = "";
+                            } else {
+                                if (iqtd > 1) {
+                                    iqtd = (iqtd - 1);
+                                    GuardaQtd = iqtd;
+                                    Chama_Fechamento();
+                                }
+                            }
+                            Menu_Lateral();
+                        } else {
+                            if (smodimp.equals("01")) {
+                                Imprime_BPe(); //SUNMI
+                                int iqtd = GuardaQtd;
+                                if (iqtd > 1) {
+                                    iqtd = (iqtd - 1);
+                                    GuardaQtd = iqtd;
+                                    Chama_Fechamento();
+                                }
+                            } else if (smodimp.equals("03")) {
+                                Imprime_BPe_BT(); //ARNY SP5 Bluetooth
+                                int iqtd = GuardaQtd;
+                                if (iqtd > 1) {
+                                    iqtd = (iqtd - 1);
+                                    GuardaQtd = iqtd;
+                                    Chama_Fechamento();
+                                }
+                            } else if (smodimp.equals("05")) {
+                                Imprime_BPe_DTS(); //ARNY SP5 Bluetooth
+                                int iqtd = GuardaQtd;
+                                if (iqtd > 1) {
+                                    iqtd = (iqtd - 1);
+                                    GuardaQtd = iqtd;
+                                    Chama_Fechamento();
+                                }
+                            } else {
+                                Imprime_BPe_Lio(); //CIELO LIO
+                                int iqtd = GuardaQtd;
+                                if (iqtd == 1) {
+                                    GuardaPagto = "";
+                                    GuardaBand = "";
+                                    GuardaAut = "";
+                                    GuardaID = "";
+                                    sfimCONEXAO = "S";
+                                } else {
+                                    if (iqtd > 1) {
+                                        iqtd = (iqtd - 1);
+                                        GuardaQtd = iqtd;
+                                        Chama_Fechamento();
+                                    }
+                                }
+                            }
+                            edtCad.setText("");
+                            edtNomPas.setText("");
+                            edtDocPas.setText("");
+                            edtcpfpas.setText("");
+                            edttipgra.setText("");
+                            edttipdes.setText("");
+                            if (EnviaConexao.equals("S")) {
+                                if (sfimCONEXAO.equals("S")) {
+                                    edtvia.setText(GuardaVia);
+                                    edtori.setText(GuardaOri);
+                                    edtdes.setText(GuardaDes);
+                                    Linha_Trab = GuardaLinha;
+                                    Calcula_Valor_DB();
+                                    EnviaConexao = "";
+                                    Menu_Lateral();
+                                }
+                            }
+                        }
+
 
                     }
+                    if (sorigemresult.equals("14")) {
+                        synchronized (msgBuilder) {
+                            msgBuilder.append(resultado).append("\n");
+                            iPendentes++;
+                            System.out.println("concluído com resultado: " + resultado);
+                            System.out.println("Totpen: " + iTotpendentes + " ipen: " + iPendentes);
+
+                            runOnUiThread(() -> {
+                                // progressText.setText("Processando: " + iPendentes + "/" + iTotpendentes);
+                                if (iPendentes == iTotpendentes) {
+                                    MsgAgrupa = msgBuilder.toString();
+                                    System.out.println("Exibindo mensagem final: " + MsgAgrupa);
+                                    infMensagens(MsgAgrupa, "");
+                                    //   progressText.setText("Concluído!");
+                                } else {
+                                    // Envia o próximo bilhete após o retorno do anterior
+                                    enviarProximoBilhete();
+                                }
+                            });
+                        }
+                    }
+
+                }
+
+            }
+
+
+            // se o resultado retornou do WS cancelamento
+            if (sorigemresult.equals("13")) {
+                if (result.getResultCode() == RESULT_OK) {
+                    String snumero = data.getStringExtra("numbpe");
+                    if (!snumero.equals("")) {
+                        if (smodimp.equals("01")) {
+                            Imprime_Cancel(snumero); //SUNMI
+                        } else if (smodimp.equals("02")) {
+                            Imprime_Cancel_LIO(snumero); //CIELO LIO
+                        } else if (smodimp.equals("03")) {
+                            Imprime_Cancel_BT(snumero); //ARNY
+                        } else if (smodimp.equals("05")) {
+                            Imprime_Cancel_DTS(snumero); //ARNY AR-2500
+                        }
+                    }
+                    infMensagens("Bilhete Cancelado com Sucesso!", "");
+                }
+
+                if (result.getResultCode() == RESULT_CANCELED) {
+                    //Toast.makeText(this, "Erro: " + msg, Toast.LENGTH_LONG).show();
+                    ///Nao conseguiu cancelar
+                    infMensagens(sret, "");
+
+                }
 
 
             }
 
+            // se o resultado retornou da tela de parametros
+            if (sorigemresult.equals("15")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    Menu_Lateral();
+
+                }
+
+            }
+            // se o resultado retornou do verifica conexao
+            if (sorigemresult.equals("17")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+                    System.out.println("Retornei WSActivity Verificar Conexao: " + sret);
+                    if (sret.equals("Conectado")) {
+                        EstouConectado = true;
+                    } else {
+                        EstouConectado = false;
+                    }
+
+                } else {
+                    EstouConectado = false;
+                }
+
+            }
+            // se o resultado retornou do verifica gratuidade
+            if (sorigemresult.equals("21")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+                    Intent Newintent = getIntent();
+                    Bundle bundle = Newintent.getExtras();
+                    String susrgra = bundle.getString("NomeUSR");
+                    String sdocgra = bundle.getString("DocUSR");
+                    String stipogra = bundle.getString("TipoUSR");
+                    System.out.println("Retornei Verificar Gratuidade: " + sret);
+
+
+                }
+
+            }
+            if (sorigemresult.equals("22")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+                    Intent Newintent = getIntent();
+                    Bundle bundle = Newintent.getExtras();
+                    String susrgra = bundle.getString("NomeUSR");
+                    String sdocgra = bundle.getString("DocUSR");
+                    String stipogra = bundle.getString("TipoUSR");
+                    System.out.println("Retornei Verificar Gratuidade: " + sret);
+                    int iqtdret = Integer.parseInt(sret);
+                    if (iqtdret >= 2) {
+                        infMensagens("Usuario excedeu limite para esta linha no mês.", "");
+                        EditText edtpas = findViewById(R.id.edtNomePas);
+                        EditText edtdoc = findViewById(R.id.edtDocPas);
+                        EditText edtcpfpas = findViewById(R.id.edtCPFPas);
+                        EditText edttipgra = findViewById(R.id.edtTipGra);
+                        EditText edttipdes = findViewById(R.id.edtTipDes);
+                        edtpas.setText("");
+                        edtdoc.setText("");
+                        edtcpfpas.setText("");
+                        edttipgra.setText("");
+                        edttipdes.setText("");
+                        TipoDoc = "";
+                    }
+                    Calcula_Valor_DB();
+
+                }
+
+            }
+
+            if(sorigemresult.equals("60")){
+                if (result.getResultCode() == RESULT_OK) {
+                    sret = data.getStringExtra("msg");
+                    String qrCodeText = sret;
+                    if(!qrCodeText.equals("")){
+                        ImageView imageViewQrCode = viewPgt.findViewById(R.id.imgQRC);
+                        QRCodeGenerator.displayQRCode(qrCodeText, imageViewQrCode, 150, 150);
+                    }
+                }
+            }
+
+            //retornou Linha de conexao
+            if (sorigemresult.equals("100")) {
+                EditText edtlinhac = viewConexao.findViewById(R.id.edtLinhac);
+                EditText edtViagem = viewConexao.findViewById(R.id.edtViac);
+                EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
+                EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
+                TextView txtTarifa = viewConexao.findViewById(R.id.txtValorc);
+                CheckBox ckbSeguro = viewConexao.findViewById(R.id.ckbSeguroc);
+                TextView txtvalortot = viewConexao.findViewById(R.id.txtValortot);
+
+                if (result.getResultCode() == RESULT_OK) {
+                    edtlinhac.setText(sret);
+                    ckbSeguro.setChecked(true);
+                    edtViagem.setText("Selecione a Viagem");
+                    edtOrigem.setText("Selecione a Origem");
+                    edtDestino.setText("Selecione o Destino");
+                    txtTarifa.setText("0.00");
+                    String stotal = String.format("%.2f", GuardaValor);
+                    txtvalortot.setText(stotal);
+                } else {
+                    edtlinhac.setText("Selecione a Linha");
+                    ckbSeguro.setChecked(true);
+                    edtViagem.setText("Selecione a Viagem");
+                    edtOrigem.setText("Selecione a Origem");
+                    edtDestino.setText("Selecione o Destino");
+                    txtTarifa.setText("0.00");
+                    String stotal = String.format("%.2f", GuardaValor);
+                    txtvalortot.setText(stotal);
+                }
+
+            } //
+
+            //retornou viagem de conexao
+            if (sorigemresult.equals("101")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    EditText edtViagem = viewConexao.findViewById(R.id.edtViac);
+                    edtViagem.setText(sret);
+                    EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
+                    EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
+                    TextView txtTarifa = viewConexao.findViewById(R.id.txtValorc);
+                    CheckBox ckbSeguro = viewConexao.findViewById(R.id.ckbSeguroc);
+                    ckbSeguro.setChecked(true);
+                    edtOrigem.setText("Selecione a Origem");
+                    edtDestino.setText("Selecione o Destino");
+                    txtTarifa.setText("0.00");
+                }
+
+            } //101
+
+            // se o resultado retornou a Origem da conexao
+            if (sorigemresult.equals("102")) {
+
+                if (result.getResultCode() == RESULT_OK) {
+
+                    // mostra hint
+                    //Toast.makeText(this, "Origem: " + msg, Toast.LENGTH_LONG).show();
+                    EditText edtOrigem = viewConexao.findViewById(R.id.edtOrigemc);
+                    edtOrigem.setText(sret);
+                    Confere_campos_DG(viewConexao);
+                } else {
+                    Confere_campos_DG(viewConexao);
+                }
+
+
+            }
+            // se o resultado retornou o Destino da conexao
+            if (sorigemresult.equals("103")) {
+                if (result.getResultCode() == RESULT_OK) {
+
+                    // mostra hint
+                    //Toast.makeText(this, "Destino: " + msg, Toast.LENGTH_LONG).show();
+                    EditText edtDestino = viewConexao.findViewById(R.id.edtDestinoc);
+                    edtDestino.setText(sret);
+                    Confere_campos_DG(viewConexao);
+
+                } else {
+                    Confere_campos_DG(viewConexao);
+                }
+
+            }
+            //Se retornou leitura da camera
+            if (sorigemresult.equals("104")) {
+                if (result.getResultCode() == RESULT_OK) {
+                    String contents = data.getStringExtra("SCAN_RESULT");
+                    String value = contents;
+                    Guarda_QRcode = value;
+                    dbemp.Atualizar_Campo_Emp("1", "Ultqrc", value);
+                    //Toast.makeText(getApplicationContext(), contents, Toast.LENGTH_LONG).show();
+                    Log.i("CONTENT SCAN ", contents);
+                    Log.i("CONTENT VALUE", value);
+                    if (!value.equals("")) {
+
+                        //DB_EMP dbempvenda = new DB_EMP(ViaActivity.this);
+                        //String sqrc = dbempvenda.Busca_Dados_Emp(1, "Ultqrc");
+                        Log.i(TAG, "Retorno Leitura: " + value);
+                        if (!value.equals("")) {
+
+                            EditText edtVia = findViewById(R.id.edtVia);
+                            String sser = dbemp.Busca_Dados_Emp(1, "Serie");
+                            String svia = edtVia.getText().toString();
+                            TextView txtTarifa = findViewById(R.id.txtValor);
+                            String svalor = txtTarifa.getText().toString();
+                            svalor = svalor.replace(",", "");
+                            com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.getInstance().chargePassenger(ViaActivity.this, svalor, value, sser, svia, new OnboardCallback<MobiPixResponseDTO<ChargeRiderResponseDTO>>() {
+                                @Override
+                                public void onSuccess(MobiPixResponseDTO<ChargeRiderResponseDTO> response) {
+                                    // processar a logica de sucesso
+                                    int istatus = response.getStatus();
+                                    Log.i(TAG, "callbackpay PAS: " + istatus);
+                                    if (istatus == 200) {
+                                        ChargeRiderResponseDTO responsechar = ChargeRiderResponseDTO.class.cast(response.getResponse());
+
+                                        LocalTransactionStatus retstatus = responsechar.getLocalTransactionStatus();
+                                        String status = retstatus.toString();
+                                        //infMensagens(status, "");
+                                        if (status.equals("AUTHORIZED")) {
+                                            //Salvar a forma de pagamento
+                                            GuardaMobi = "VALE TRANSPORTE";
+                                            GuardaID = responsechar.getLocalAuthCode();
+                                            Inicia_Venda(0);
+                                        } else {
+                                            String retresponse = responsechar.getMessage();
+                                            infMensagens(retresponse, "");
+                                        }
+
+
+                                    }
+
+                                }
+
+                                @Override
+                                public void onError(MobiPixResponseDTO<ChargeRiderResponseDTO> response) {
+                                    // processar a logica de erro
+                                    String serro = "ERRO";
+                                    int istatus = response.getStatus();
+                                    if (istatus == 400) {
+                                        serro = "Requisição inválida";
+                                    } else if (istatus == 401) {
+                                        serro = "Usuário não autorizado";
+                                    } else if (istatus == 500) {
+                                        serro = "Erro no servidor do App";
+                                    } else {
+                                        serro = response.getMessageKey();
+                                    }
+                                    infMensagens(response.getStatus() + " = " + serro, "");
+
+                                }
+                            });
+
+
+                        }
+                    }
+                } else if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                    // Handle cancel
+                }
+
+            }
+
+
+        }
+
     });
+
+    // Launcher para pedir ao sistema que ative o Bluetooth
+    private ActivityResultLauncher<Intent> enableBluetoothLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    // Bluetooth foi ativado com sucesso
+                    //Toast.makeText(this, "Bluetooth ativado!", Toast.LENGTH_SHORT).show();
+                } else {
+                    // Usuário cancelou
+                    Toast.makeText(this, "Bluetooth não foi ativado.", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+    // Launcher para pedir permissões em tempo de execução (Android 12+)
+    private ActivityResultLauncher<String[]> permissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), grants -> {
+                // Depois das permissões, tente habilitar novamente
+                tryEnableBluetooth();
+            });
+
+
+    private void tryEnableBluetooth() {
+        if (bluetoothAdapter == null) {
+            Toast.makeText(this, "Este dispositivo não suporta Bluetooth.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // Android 12+ precisa de BLUETOOTH_CONNECT para consultar/operar o adapter
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(new String[]{ Manifest.permission.BLUETOOTH_CONNECT });
+                return;
+            }
+        }
+
+        if (!bluetoothAdapter.isEnabled()) {
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            enableBluetoothLauncher.launch(enableIntent);
+        } else {
+            //Toast.makeText(this, "Bluetooth já está ativado.", Toast.LENGTH_SHORT).show();
+            Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+            for (BluetoothDevice bondedDevice : bondedDevices) {
+                if (bondedDevice.getName().toLowerCase().contains("print")) {
+                    printerBluetooth = bondedDevice;
+                    break;
+                }
+            }
+        }
+    }
+
 
 
     public void Imprime_Cancel(final String snumero) {
@@ -3222,7 +3524,7 @@ public class ViaActivity extends AppCompatActivity {
                         //Dados a Empresa
                         DB_EMP dbemp = new DB_EMP(getApplicationContext());
                         DB_BPE dbbpe = new DB_BPE(getApplicationContext());
-                        String sespacos = dbemp.Busca_Dados_Emp(1,"Rsv003");
+                        String sespacos = dbemp.Busca_Dados_Emp(1, "Rsv003");
                         float size = 30;
                         woyouService.setAlignment(1, callback);
                         woyouService.printBitmap(mBitmap, callback);
@@ -3277,34 +3579,34 @@ public class ViaActivity extends AppCompatActivity {
                         String svalor = dbbpe.Busca_Dados_Bpe(snumero, "Vlrpas");
 
                         woyouService.lineWrap(1, null);
-                        woyouService.printTextWithFont("Viagem: "+slinha, "", 22, null);
+                        woyouService.printTextWithFont("Viagem: " + slinha, "", 22, null);
                         woyouService.lineWrap(1, null);
-                        woyouService.printTextWithFont("Origem: "+sori, "", 22, null);
+                        woyouService.printTextWithFont("Origem: " + sori, "", 22, null);
                         woyouService.lineWrap(1, null);
-                        woyouService.printTextWithFont("Destino: "+sdes, "", 22, null);
+                        woyouService.printTextWithFont("Destino: " + sdes, "", 22, null);
                         woyouService.lineWrap(2, null);
 
                         String sNROBPE = (("000000000" + snumero).substring(snumero.length()));
-                        String Modser =  dbbpe.Busca_Dados_Bpe(snumero, "Modser");
+                        String Modser = dbbpe.Busca_Dados_Bpe(snumero, "Modser");
                         String sSERBPE = Modser.substring(2, (5));
 
-                        woyouService.printTextWithFont("BP-e nº ", "", 24,null);
-                        woyouService.printTextWithFont((sNROBPE)+"    ", "", 24,null);
-                        woyouService.printTextWithFont("Série ", "", 24,null);
-                        woyouService.printTextWithFont((sSERBPE)+"", "", 24,null);
+                        woyouService.printTextWithFont("BP-e nº ", "", 24, null);
+                        woyouService.printTextWithFont((sNROBPE) + "    ", "", 24, null);
+                        woyouService.printTextWithFont("Série ", "", 24, null);
+                        woyouService.printTextWithFont((sSERBPE) + "", "", 24, null);
                         woyouService.lineWrap(2, null);
 
 
                         String sespaco = "";
-                        String sval = "Valor Total R$"+svalor;
+                        String sval = "Valor Total R$" + svalor;
                         Integer iqtd = sval.length();
                         if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
-                            Integer iresto = (32-iqtd);
+                            Integer iresto = (32 - iqtd);
                             while (sespaco.length() < iresto) {
                                 sespaco = " " + sespaco;
                             }
                         }
-                        woyouService.setAlignment (0, callback); //Alinhamento Esquerda
+                        woyouService.setAlignment(0, callback); //Alinhamento Esquerda
                         woyouService.printTextWithFont("Valor Total R$" + sespaco, "", 24, null);
                         woyouService.printTextWithFont(svalor, "", 24, null);
                         woyouService.lineWrap(2, null);
@@ -3313,10 +3615,10 @@ public class ViaActivity extends AppCompatActivity {
                         String sanoe = shoreve.substring(0, (4)); //Posicao inicial(considerando 0), posicao final(desconsiderando 0)
                         String smese = shoreve.substring(5, (7));
                         String sdiae = shoreve.substring(8, (10));
-                        String sdEmi = sdiae+"/"+smese+"/"+sanoe;
+                        String sdEmi = sdiae + "/" + smese + "/" + sanoe;
                         String sHorae = shoreve.substring(11, (19));
 
-                        woyouService.printTextWithFont("DH Evento: "+sdEmi+"  "+sHorae, "", 24, null);
+                        woyouService.printTextWithFont("DH Evento: " + sdEmi + "  " + sHorae, "", 24, null);
                         woyouService.lineWrap(2, null);
 
                         woyouService.printTextWithFont("MOTIVO", "", 24, null);
@@ -3332,7 +3634,6 @@ public class ViaActivity extends AppCompatActivity {
                         }
 
 
-
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -3344,197 +3645,360 @@ public class ViaActivity extends AppCompatActivity {
             }
         });
     }
+
     @SuppressLint("MissingPermission")
     public void Imprime_Cancel_BT(final String snumero) {
-                try {
-                    if (printerBluetooth == null)
-                        acharPrinterBluetooth();
-                    if (printerBluetooth == null)
-                        return;
-                    DB_BPE dbbpe = new DB_BPE(getApplicationContext());
-                    String smotivo2 = "";
-                    BluetoothSocket impressora = printerBluetooth.createInsecureRfcommSocketToServiceRecord(UUID.randomUUID());
+        try {
+            if (printerBluetooth == null)
+                tryEnableBluetooth();
+            if (printerBluetooth == null)
+                return;
+            DB_BPE dbbpe = new DB_BPE(getApplicationContext());
+            String smotivo2 = "";
+            BluetoothSocket impressora = printerBluetooth.createInsecureRfcommSocketToServiceRecord(UUID.randomUUID());
 
-                    impressora.connect();
-                    try {
-                        iniciarImpressora(impressora.getOutputStream());
-                        OutputStream out = impressora.getOutputStream();
+            impressora.connect();
+            try {
+                iniciarImpressora(impressora.getOutputStream());
+                OutputStream out = impressora.getOutputStream();
 
-                        out.write(EscPosBase.getFontWBold()); // Ativar Fonte em Negrito
-                        out.write(EscPosBase.alignCenter()); //Centralizado
-                        //Dados a Empresa
-                        DB_EMP dbemp = new DB_EMP(getApplicationContext());
+                out.write(EscPosBase.getFontWBold()); // Ativar Fonte em Negrito
+                out.write(EscPosBase.alignCenter()); //Centralizado
+                //Dados a Empresa
+                DB_EMP dbemp = new DB_EMP(getApplicationContext());
 
-                        String sespacos = dbemp.Busca_Dados_Emp(1,"Rsv003");
+                String sespacos = dbemp.Busca_Dados_Emp(1, "Rsv003");
 
-                        out.write(dbemp.Busca_Dados_Emp(1,"Descri").getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine());
-                        out.write(EscPosBase.getFontWNormal()); // Desativar Fonte em Negrito
+                out.write(dbemp.Busca_Dados_Emp(1, "Descri").getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine());
+                out.write(EscPosBase.getFontWNormal()); // Desativar Fonte em Negrito
 
-                        String scnpj = dbemp.Busca_Dados_Emp(1, "Cnpj");
-                        String sIe = dbemp.Busca_Dados_Emp(1, "Insest");
+                String scnpj = dbemp.Busca_Dados_Emp(1, "Cnpj");
+                String sIe = dbemp.Busca_Dados_Emp(1, "Insest");
 
-                        String sinscricao = "CNPJ: " + scnpj + " IE: " + sIe;
-                        out.write(sinscricao.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine());
+                String sinscricao = "CNPJ: " + scnpj + " IE: " + sIe;
+                out.write(sinscricao.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine());
 
-                        String sendp1, sendp2, sendere, snum, sbai, scid, suf;
-                        sendere = dbemp.Busca_Dados_Emp(1, "Endere");
-                        snum = dbemp.Busca_Dados_Emp(1, "Numero");
-                        sbai = dbemp.Busca_Dados_Emp(1, "Bairro");
-                        scid = dbemp.Busca_Dados_Emp(1, "Cidade");
-                        suf = dbemp.Busca_Dados_Emp(1, "UF");
-                        sendp1 = sendere + ", " + snum;
-                        sendp2 = sbai + ", " + scid + "-" + suf;
+                String sendp1, sendp2, sendere, snum, sbai, scid, suf;
+                sendere = dbemp.Busca_Dados_Emp(1, "Endere");
+                snum = dbemp.Busca_Dados_Emp(1, "Numero");
+                sbai = dbemp.Busca_Dados_Emp(1, "Bairro");
+                scid = dbemp.Busca_Dados_Emp(1, "Cidade");
+                suf = dbemp.Busca_Dados_Emp(1, "UF");
+                sendp1 = sendere + ", " + snum;
+                sendp2 = sbai + ", " + scid + "-" + suf;
 
-                        out.write(EscPosBase.getFontWNormal()); // Desativar Fonte em Negrito
-                        out.write(sendp1.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine());
-                        out.write(sendp2.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(2));
-                        out.write(EscPosBase.getFontTall());//Aumentar o tamanho da fonte
-                        out.write("CANCELAMENTO".getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine());
-                        out.write(EscPosBase.getFontNormal());//Fonte tamanho Normal
+                out.write(EscPosBase.getFontWNormal()); // Desativar Fonte em Negrito
+                out.write(sendp1.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine());
+                out.write(sendp2.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(2));
+                out.write(EscPosBase.getFontTall());//Aumentar o tamanho da fonte
+                out.write("CANCELAMENTO".getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine());
+                out.write(EscPosBase.getFontNormal());//Fonte tamanho Normal
 
-                        String ssit = dbbpe.Busca_Dados_Bpe(snumero, "Sitbpe");
-                        if (ssit.equals("CT")) { //emitido em contingencia
-                            out.write(EscPosBase.nextLine());
-                            out.write("EMITIDO EM CONTINGENCIA".getBytes(StandardCharsets.UTF_8));
-                            out.write(EscPosBase.nextLine(1));
-                            out.write("Pendente de Autorizacao".getBytes(StandardCharsets.UTF_8));
-                            out.write(EscPosBase.nextLine(1));
+                String ssit = dbbpe.Busca_Dados_Bpe(snumero, "Sitbpe");
+                if (ssit.equals("CT")) { //emitido em contingencia
+                    out.write(EscPosBase.nextLine());
+                    out.write("EMITIDO EM CONTINGENCIA".getBytes(StandardCharsets.UTF_8));
+                    out.write(EscPosBase.nextLine(1));
+                    out.write("Pendente de Autorizacao".getBytes(StandardCharsets.UTF_8));
+                    out.write(EscPosBase.nextLine(1));
 
-                        }
-
-                        String slinha = dbbpe.Busca_Dados_Bpe(snumero, "Nomvia");
-                        String sori = dbbpe.Busca_Dados_Bpe(snumero, "Treori");
-                        String sdes = dbbpe.Busca_Dados_Bpe(snumero, "Tredes");
-                        String svalor = dbbpe.Busca_Dados_Bpe(snumero, "Vlrpas");
-
-                        String svia = "Viagem: "+slinha;
-                        out.write(svia.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(1));
-                        String sorigem = "Origem: "+sori;
-                        out.write(sorigem.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(1));
-                        String sdestino = "Destino: "+sdes;
-                        out.write(sdestino.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(1));
-
-
-                        String sNROBPE = (("000000000" + snumero).substring(snumero.length()));
-                        String Modser =  dbbpe.Busca_Dados_Bpe(snumero, "Modser");
-                        String sSERBPE = Modser.substring(2, (5));
-                        String snumser = ("BP-e nro "+sNROBPE+"    Serie "+sSERBPE);
-                        out.write(snumser.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(2));
-
-
-                        String sespaco = "";
-                        String sval = "Valor Total R$"+svalor;
-                        Integer iqtd = sval.length();
-                        if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
-                            Integer iresto = (32-iqtd);
-                            while (sespaco.length() < iresto) {
-                                sespaco = " " + sespaco;
-                            }
-                        }
-                        out.write(EscPosBase.alignLeft()); //Esquerda
-                        //out.write(EscPosBase.alignCenter()); //Centralizado
-                        String svalbpe = "Valor Total R$" + sespaco;
-                        out.write(svalbpe.getBytes(StandardCharsets.UTF_8));
-                        out.write(svalor.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(2));
-
-
-                        String shoreve = Funcoes_Android.getCurrentUTC();
-                        String sanoe = shoreve.substring(0, (4)); //Posicao inicial(considerando 0), posicao final(desconsiderando 0)
-                        String smese = shoreve.substring(5, (7));
-                        String sdiae = shoreve.substring(8, (10));
-                        String sdEmi = sdiae+"/"+smese+"/"+sanoe;
-                        String sHorae = shoreve.substring(11, (19));
-
-                        String sdataeve = "DH Evento: "+sdEmi+"  "+sHorae;
-                        out.write(sdataeve.getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(2));
-
-                        out.write("MOTIVO".getBytes(StandardCharsets.UTF_8));
-                        out.write(EscPosBase.nextLine(1));
-
-
-                        String smotivo = dbbpe.Busca_Dados_Bpe(snumero, "Rsv003");
-                        out.write(smotivo.getBytes(StandardCharsets.UTF_8));
-                        smotivo2 = smotivo;
-
-                        if (sespacos.equals("xx")) {
-                            out.write(EscPosBase.nextLine(4));
-                        } else {
-                            int iesp = Integer.parseInt(sespacos);
-                            out.write(EscPosBase.nextLine(iesp));
-                        }
-
-
-
-                    } finally {
-                        // btnPrint.setEnabled(true);
-                        impressora.close();
-                    }
-                    //Se for vale transporte, proceder estorno
-                    String sidpagto = dbbpe.Busca_Dados_Bpe(snumero, "Nidpag");
-                    String stippag = dbbpe.Busca_Dados_Bpe(snumero, "Pagmto");
-                    if (!sidpagto.equals("")) {
-                        Log.i(TAG,"stippag: " + stippag);
-                        if (stippag.equals("05")) {
-                            com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.getInstance().voidTransaction(ViaActivity.this, sidpagto , new OnboardCallback<MobiPixResponseDTO<VoidTransactionResponseDTO>>() {
-                                @Override
-                                public void onSuccess(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
-                                    // processar a logica de sucesso
-                                    int istatus = response.getStatus();
-                                    Log.i(TAG,"callbackpay Calc: " + istatus);
-                                    if (istatus == 200) {
-                                        VoidTransactionResponseDTO responsecanc = VoidTransactionResponseDTO.class.cast(response.getResponse());
-                                        RemoteTransactionStatus retstatus = responsecanc.getRollbackTransactionStatus();
-                                        String status = retstatus.toString();
-                                        // Log.i(TAG,"Status Cancel: " + status);
-                                        if (status.equals("AUTHORIZED")) {
-                                            //infMensagens("Venda Estornada.", "");
-                                        } else {
-                                            infMensagens(responsecanc.getMessage(), "");
-                                        }
-
-
-                                    }
-                                }
-
-                                @Override
-                                public void onError(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
-                                    // processar a logica de sucesso
-                                    infMensagens(response.getMessageKey(), "");
-                                    Log.i(TAG,"Erro Cancel: " + response.getErrorDetails());
-                                }
-                            });
-
-                        } else {
-                            DB_EMP dbemp = new DB_EMP(ViaActivity.this);
-                            String sultbil = dbemp.Busca_Dados_Emp(1, "Ultbil");
-                            if (sultbil.equals(snumero)) {
-                                Start_Cielo();
-                                cancelPayment(snumero, smotivo2);
-                            } else {
-                                infMensagens("Pagamento com cartão.\nNão foi a última venda.\nCancelamento não Permitido.", "");
-                            }
-                        }
-                    }
-
-
-                } catch (Exception e) {
-                    Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
+
+                String slinha = dbbpe.Busca_Dados_Bpe(snumero, "Nomvia");
+                String sori = dbbpe.Busca_Dados_Bpe(snumero, "Treori");
+                String sdes = dbbpe.Busca_Dados_Bpe(snumero, "Tredes");
+                String svalor = dbbpe.Busca_Dados_Bpe(snumero, "Vlrpas");
+
+                String svia = "Viagem: " + slinha;
+                out.write(svia.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(1));
+                String sorigem = "Origem: " + sori;
+                out.write(sorigem.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(1));
+                String sdestino = "Destino: " + sdes;
+                out.write(sdestino.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(1));
+
+
+                String sNROBPE = (("000000000" + snumero).substring(snumero.length()));
+                String Modser = dbbpe.Busca_Dados_Bpe(snumero, "Modser");
+                String sSERBPE = Modser.substring(2, (5));
+                String snumser = ("BP-e nro " + sNROBPE + "    Serie " + sSERBPE);
+                out.write(snumser.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(2));
+
+
+                String sespaco = "";
+                String sval = "Valor Total R$" + svalor;
+                Integer iqtd = sval.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+                out.write(EscPosBase.alignLeft()); //Esquerda
+                //out.write(EscPosBase.alignCenter()); //Centralizado
+                String svalbpe = "Valor Total R$" + sespaco;
+                out.write(svalbpe.getBytes(StandardCharsets.UTF_8));
+                out.write(svalor.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(2));
+
+
+                String shoreve = Funcoes_Android.getCurrentUTC();
+                String sanoe = shoreve.substring(0, (4)); //Posicao inicial(considerando 0), posicao final(desconsiderando 0)
+                String smese = shoreve.substring(5, (7));
+                String sdiae = shoreve.substring(8, (10));
+                String sdEmi = sdiae + "/" + smese + "/" + sanoe;
+                String sHorae = shoreve.substring(11, (19));
+
+                String sdataeve = "DH Evento: " + sdEmi + "  " + sHorae;
+                out.write(sdataeve.getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(2));
+
+                out.write("MOTIVO".getBytes(StandardCharsets.UTF_8));
+                out.write(EscPosBase.nextLine(1));
+
+
+                String smotivo = dbbpe.Busca_Dados_Bpe(snumero, "Rsv003");
+                out.write(smotivo.getBytes(StandardCharsets.UTF_8));
+                smotivo2 = smotivo;
+
+                if (sespacos.equals("xx")) {
+                    out.write(EscPosBase.nextLine(4));
+                } else {
+                    int iesp = Integer.parseInt(sespacos);
+                    out.write(EscPosBase.nextLine(iesp));
+                }
+
+
+            } finally {
+                // btnPrint.setEnabled(true);
+                impressora.close();
+            }
+            //Se for vale transporte, proceder estorno
+            String sidpagto = dbbpe.Busca_Dados_Bpe(snumero, "Nidpag");
+            String stippag = dbbpe.Busca_Dados_Bpe(snumero, "Pagmto");
+            if (!sidpagto.equals("")) {
+                Log.i(TAG, "stippag: " + stippag);
+                if (stippag.equals("05")) {
+                    com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.getInstance().voidTransaction(ViaActivity.this, sidpagto, new OnboardCallback<MobiPixResponseDTO<VoidTransactionResponseDTO>>() {
+                        @Override
+                        public void onSuccess(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
+                            // processar a logica de sucesso
+                            int istatus = response.getStatus();
+                            Log.i(TAG, "callbackpay Calc: " + istatus);
+                            if (istatus == 200) {
+                                VoidTransactionResponseDTO responsecanc = VoidTransactionResponseDTO.class.cast(response.getResponse());
+                                RemoteTransactionStatus retstatus = responsecanc.getRollbackTransactionStatus();
+                                String status = retstatus.toString();
+                                // Log.i(TAG,"Status Cancel: " + status);
+                                if (status.equals("AUTHORIZED")) {
+                                    //infMensagens("Venda Estornada.", "");
+                                } else {
+                                    infMensagens(responsecanc.getMessage(), "");
+                                }
+
+
+                            }
+                        }
+
+                        @Override
+                        public void onError(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
+                            // processar a logica de sucesso
+                            infMensagens(response.getMessageKey(), "");
+                            Log.i(TAG, "Erro Cancel: " + response.getErrorDetails());
+                        }
+                    });
+
+                } else {
+                    DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+                    String sultbil = dbemp.Busca_Dados_Emp(1, "Ultbil");
+                    if (sultbil.equals(snumero)) {
+                        Start_Cielo();
+                        cancelPayment(snumero, smotivo2);
+                    } else {
+                        infMensagens("Pagamento com cartão.\nNão foi a última venda.\nCancelamento não Permitido.", "");
+                    }
+                }
+            }
+
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
 
 
     }
 
+    @SuppressLint("MissingPermission")
+    public void Imprime_Cancel_DTS(final String snumero) {
+        String smotivo2 = "";
+        if (printfManager == null) {
+            Intent myIntent = new Intent(ViaActivity.this, PrintfBlueListActivity.class);
+            Bundle bundle = new Bundle();
+            bundle.putString("USUARIO", Nome_user);
+            myIntent.putExtras(bundle);
+            resultadoActivity.launch(myIntent);
+        }
+        if (printfManager.isConnect()) {
+            try {
+                List<PrintfManager.PrintCommand> commands = new ArrayList<>();
+
+                //Dados a Empresa
+                DB_EMP dbemp = new DB_EMP(getApplicationContext());
+
+                String sespacos = dbemp.Busca_Dados_Emp(1, "Rsv003");
+                commands.add(new PrintfManager.PrintCommand("C", "N", "B", dbemp.Busca_Dados_Emp(1, "Descri"), 1));
+
+                String scnpj = dbemp.Busca_Dados_Emp(1, "Cnpj");
+                String sIe = dbemp.Busca_Dados_Emp(1, "Insest");
+                String sinscricao = ("CNPJ: " + scnpj);
+                commands.add(new PrintfManager.PrintCommand("C", "S", "B", sinscricao, 1));
+                sinscricao = ("IE: " + sIe);
+                commands.add(new PrintfManager.PrintCommand("C", "S", "B", sinscricao, 1));
+
+                String sendp1, sendp2, sendere, snum, sbai, scid, suf;
+                sendere = dbemp.Busca_Dados_Emp(1, "Endere");
+                snum = dbemp.Busca_Dados_Emp(1, "Numero");
+                sbai = dbemp.Busca_Dados_Emp(1, "Bairro");
+                scid = dbemp.Busca_Dados_Emp(1, "Cidade");
+                suf = dbemp.Busca_Dados_Emp(1, "UF");
+                sendp1 = sendere + ", " + snum;
+                sendp2 = sbai + ", " + scid + "-" + suf;
+
+                commands.add(new PrintfManager.PrintCommand("C", "S", "N", sendp1, 1));
+                commands.add(new PrintfManager.PrintCommand("C", "S", "N", sendp2, 1));
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", "CANCELAMENTO", 1));
+
+                DB_BPE dbbpe = new DB_BPE(ViaActivity.this);
+                String ssit = dbbpe.Busca_Dados_Bpe(snumero, "Sitbpe");
+                if (ssit.equals("CT")) { //emitido em contingencia
+                    commands.add(new PrintfManager.PrintCommand("C", "N", "N", "EMITIDO EM CONTINGENCIA", 1));
+                    commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Pendente de Autorizacao", 1));
+
+                }
+
+                String slinha = dbbpe.Busca_Dados_Bpe(snumero, "Nomvia");
+                String sori = dbbpe.Busca_Dados_Bpe(snumero, "Treori");
+                String sdes = dbbpe.Busca_Dados_Bpe(snumero, "Tredes");
+                String svalor = dbbpe.Busca_Dados_Bpe(snumero, "Vlrpas");
+
+                String svia = "Viagem: " + slinha;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", svia, 1));
+
+                String sorigem = "Origem: " + sori;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", sorigem, 1));
+                String sdestino = "Destino: " + sdes;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", sdestino, 1));
+
+
+                String sNROBPE = (("000000000" + snumero).substring(snumero.length()));
+                String Modser = dbbpe.Busca_Dados_Bpe(snumero, "Modser");
+                String sSERBPE = Modser.substring(2, (5));
+                String snumser = ("BP-e nro " + sNROBPE + "    Serie " + sSERBPE);
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", snumser, 2));
+
+
+                String sespaco = "";
+                String sval = "Valor Total R$" + svalor;
+                Integer iqtd = sval.length();
+                if (iqtd < 32) {//se a quantidade de caracteres for menor que 32 vai completar
+                    Integer iresto = (32 - iqtd);
+                    while (sespaco.length() < iresto) {
+                        sespaco = " " + sespaco;
+                    }
+                }
+
+                String svalbpe = "Valor Total R$" + sespaco + svalor;
+                commands.add(new PrintfManager.PrintCommand("L", "N", "N", svalbpe, 2));
+
+
+                String shoreve = Funcoes_Android.getCurrentUTC();
+                String sanoe = shoreve.substring(0, (4)); //Posicao inicial(considerando 0), posicao final(desconsiderando 0)
+                String smese = shoreve.substring(5, (7));
+                String sdiae = shoreve.substring(8, (10));
+                String sdEmi = sdiae + "/" + smese + "/" + sanoe;
+                String sHorae = shoreve.substring(11, (19));
+
+                String sdataeve = "DH Evento: " + sdEmi + "  " + sHorae;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", sdataeve, 2));
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", "MOTIVO", 1));
+
+                String smotivo = dbbpe.Busca_Dados_Bpe(snumero, "Rsv003");
+                smotivo2 = smotivo;
+                commands.add(new PrintfManager.PrintCommand("C", "N", "N", smotivo, 1));
+
+                if (sespacos.equals("xx")) {
+                    commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", 4));
+                } else {
+                    int iesp = Integer.parseInt(sespacos);
+                    commands.add(new PrintfManager.PrintCommand("C", "N", "N", "", iesp));
+                }
+
+                printfManager.printBufferedText(commands);
+
+            } catch (Exception e) {
+                Toast.makeText(this, "Erro ao executar impressao\n\n" + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+
+
+                DB_BPE dbbpe = new DB_BPE(ViaActivity.this);
+                String sidpagto = dbbpe.Busca_Dados_Bpe(snumero, "Nidpag");
+                String stippag = dbbpe.Busca_Dados_Bpe(snumero, "Pagmto");
+                if (!sidpagto.equals("")) {
+                    Log.i(TAG, "stippag: " + stippag);
+                    if (stippag.equals("05")) {
+                        com.x4fare.mobipix.onboard.sdk.MobiPixOnboard.getInstance().voidTransaction(ViaActivity.this, sidpagto, new OnboardCallback<MobiPixResponseDTO<VoidTransactionResponseDTO>>() {
+                            @Override
+                            public void onSuccess(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
+                                // processar a logica de sucesso
+                                int istatus = response.getStatus();
+                                Log.i(TAG, "callbackpay Calc: " + istatus);
+                                if (istatus == 200) {
+                                    VoidTransactionResponseDTO responsecanc = VoidTransactionResponseDTO.class.cast(response.getResponse());
+                                    RemoteTransactionStatus retstatus = responsecanc.getRollbackTransactionStatus();
+                                    String status = retstatus.toString();
+                                    // Log.i(TAG,"Status Cancel: " + status);
+                                    if (status.equals("AUTHORIZED")) {
+                                        //infMensagens("Venda Estornada.", "");
+                                    } else {
+                                        infMensagens(responsecanc.getMessage(), "");
+                                    }
+
+
+                                }
+                            }
+
+                            @Override
+                            public void onError(MobiPixResponseDTO<VoidTransactionResponseDTO> response) {
+                                // processar a logica de sucesso
+                                infMensagens(response.getMessageKey(), "");
+                                Log.i(TAG, "Erro Cancel: " + response.getErrorDetails());
+                            }
+                        });
+
+                    } else {
+                        DB_EMP dbemp = new DB_EMP(ViaActivity.this);
+                        String sultbil = dbemp.Busca_Dados_Emp(1, "Ultbil");
+                        if (sultbil.equals(snumero)) {
+                            Start_Cielo();
+                            cancelPayment(snumero, smotivo2);
+                        } else {
+                            infMensagens("Pagamento com cartão.\nNão foi a última venda.\nCancelamento não Permitido.", "");
+                        }
+                    }
+                }
+
+
+        }
+
+    }
 
     public void Imprime_Cancel_LIO(final String snumero) {
                 /*if (mBitmap == null) {
@@ -3975,6 +4439,7 @@ public class ViaActivity extends AppCompatActivity {
                         String schavebpeaut = dbconferebil.Busca_Dados_Bpe(sultimo, "Chvbpe");
 
                         int iqtd = GuardaQtd;
+                        System.out.println("Gerar XML GuardaQtd: "+iqtd);
                         if (smodimp.equals("01")) {
                             Imprime_BPe(); //SUNMI
                             if (iqtd == 1) {
@@ -4615,37 +5080,49 @@ public class ViaActivity extends AppCompatActivity {
                                 if (simples.equals("N")) { //empresas do regime normal
                                     Element icmsElement = document.createElement("ICMS");
                                     impElement.appendChild(icmsElement);
-                                    Element icms00Element = document.createElement("ICMS00");
-                                    icmsElement.appendChild(icms00Element);
-                                    Element cstElement = document.createElement("CST");
-                                    icms00Element.appendChild(cstElement);
-                                    cstElement.appendChild(document.createTextNode("00"));
                                     String sbasseg = dbemp.Busca_Dados_Emp(1,"Basseg");
+                                    String sbasemb = dbemp.Busca_Dados_Emp(1, "Basemb");//Taxa de embaque compoe BC
 
                                     double baseicms = vlrTar + vlrArre;
                                     //se a o seguro compoe a base de calculo do ICMS
                                     if (sbasseg.equals("S")) {
                                         baseicms = baseicms + vlrSeg;
                                     }
-                                    String sBase = String.format("%.2f", baseicms);
-                                    String valBase = sBase.replace(",", ".");
-                                    Element baseElement = document.createElement("vBC");
-                                    icms00Element.appendChild(baseElement);
-                                    baseElement.appendChild(document.createTextNode(valBase));
-                                    double aliq = Double.valueOf(dbemp.Busca_Dados_Emp(1, "Aliicm")).doubleValue();
-                                    String sAliq = String.format("%.2f", aliq);
-                                    String valAliq = sAliq.replace(",", ".");
-                                    Element aliqElement = document.createElement("pICMS");
-                                    icms00Element.appendChild(aliqElement);
-                                    aliqElement.appendChild(document.createTextNode(valAliq));
-                                    double icms = (baseicms / 100 * aliq);
-                                    BigDecimal valorExato = new BigDecimal(icms).setScale(2, RoundingMode.HALF_DOWN);
-                                    String sIcms = String.format("%.2f", valorExato);
-                                    String valICMS = sIcms.replace(",", ".");
-                                    Element vicmsElement = document.createElement("vICMS");
-                                    icms00Element.appendChild(vicmsElement);
-                                    vicmsElement.appendChild(document.createTextNode(valICMS));
+                                    if (sbasemb.equals("S")) {
+                                        baseicms = baseicms +vlremb;
+                                    }
+                                    if (baseicms >0) {
+                                        Element icms00Element = document.createElement("ICMS00");
+                                        icmsElement.appendChild(icms00Element);
+                                        Element cstElement = document.createElement("CST");
+                                        icms00Element.appendChild(cstElement);
+                                        cstElement.appendChild(document.createTextNode("00"));
 
+                                        String sBase = String.format("%.2f", baseicms);
+                                        String valBase = sBase.replace(",", ".");
+                                        Element baseElement = document.createElement("vBC");
+                                        icms00Element.appendChild(baseElement);
+                                        baseElement.appendChild(document.createTextNode(valBase));
+                                        double aliq = Double.valueOf(dbemp.Busca_Dados_Emp(1, "Aliicm")).doubleValue();
+                                        String sAliq = String.format("%.2f", aliq);
+                                        String valAliq = sAliq.replace(",", ".");
+                                        Element aliqElement = document.createElement("pICMS");
+                                        icms00Element.appendChild(aliqElement);
+                                        aliqElement.appendChild(document.createTextNode(valAliq));
+                                        double icms = (baseicms / 100 * aliq);
+                                        BigDecimal valorExato = new BigDecimal(icms).setScale(2, RoundingMode.HALF_DOWN);
+                                        String sIcms = String.format("%.2f", valorExato);
+                                        String valICMS = sIcms.replace(",", ".");
+                                        Element vicmsElement = document.createElement("vICMS");
+                                        icms00Element.appendChild(vicmsElement);
+                                        vicmsElement.appendChild(document.createTextNode(valICMS));
+                                    } else {//gratuidade integral imprime CST 41
+                                        Element icms45Element = document.createElement("ICMS45");
+                                        icmsElement.appendChild(icms45Element);
+                                        Element cstElement = document.createElement("CST");
+                                        icms45Element.appendChild(cstElement);
+                                        cstElement.appendChild(document.createTextNode("41"));
+                                    }
 
                                 } else { //empresas do simples nacional
                                     Element icmssnElement = document.createElement("ICMSSN");
@@ -4668,6 +5145,107 @@ public class ViaActivity extends AppCompatActivity {
                                 Element vtribElement = document.createElement("vTotTrib");
                                 impElement.appendChild(vtribElement);
                                 vtribElement.appendChild(document.createTextNode(stottrib));
+
+                                ///INFORMACOES DE IBS E CBS CONFORME LEI COMPLEMENTAR 214/2025
+                                Element IBSCBSElement = document.createElement("IBSCBS");
+                                impElement.appendChild(IBSCBSElement);
+                                Element cstElement = document.createElement("CST");
+                                IBSCBSElement.appendChild(cstElement);
+                                cstElement.appendChild(document.createTextNode("200"));
+                                Element classeElement = document.createElement("cClassTrib");
+                                IBSCBSElement.appendChild(classeElement);
+                                classeElement.appendChild(document.createTextNode("200049"));
+                                Element gIBSCBSElement = document.createElement("gIBSCBS");
+                                IBSCBSElement.appendChild(gIBSCBSElement);
+                                Element BCElement = document.createElement("vBC");
+                                gIBSCBSElement.appendChild(BCElement);
+                                double baseibscbs = 0;
+                                if (vlrArre > 0) {
+                                    baseibscbs = vlrTar + vlremb + vlrSeg + vlrArre;
+                                } else {
+                                    baseibscbs = vlrTar + vlremb + vlrSeg;
+                                }
+
+                                String sBase = String.format("%.2f", baseibscbs);
+                                String valBase = sBase.replace(",", ".");
+                                BCElement.appendChild(document.createTextNode(valBase));
+                                Element gIBSUF = document.createElement("gIBSUF");
+                                gIBSCBSElement.appendChild(gIBSUF);
+                                Element paliIBSUFElement = document.createElement("pIBSUF");
+                                gIBSUF.appendChild(paliIBSUFElement);
+                                paliIBSUFElement.appendChild(document.createTextNode("0.10"));
+                                //Grupo para informar reducao de aliquota
+                                Element gRedElement = document.createElement("gRed");
+                                gIBSUF.appendChild(gRedElement);
+                                Element pRedAliElement = document.createElement("pRedAliq");
+                                gRedElement.appendChild(pRedAliElement);
+                                pRedAliElement.appendChild(document.createTextNode("40.00"));
+                                Element pAliEfetElement = document.createElement("pAliqEfet");
+                                gRedElement.appendChild(pAliEfetElement);
+                                pAliEfetElement.appendChild(document.createTextNode("0.06"));
+                                /////
+                                Element vIBSUFElement = document.createElement("vIBSUF");
+                                gIBSUF.appendChild(vIBSUFElement);
+                                double ibsuf = (baseibscbs / 100 * 0.06);
+                                BigDecimal valorExato = new BigDecimal(ibsuf).setScale(2, RoundingMode.HALF_DOWN);
+                                String sIBSUF = String.format("%.2f", valorExato);
+                                String valIBSUF = sIBSUF.replace(",", ".");
+                                vIBSUFElement.appendChild(document.createTextNode(valIBSUF));
+                                Element gIBSMUN = document.createElement("gIBSMun");
+                                gIBSCBSElement.appendChild(gIBSMUN);
+                                Element paliIBSMUNElement = document.createElement("pIBSMun");
+                                gIBSMUN.appendChild(paliIBSMUNElement);
+                                paliIBSMUNElement.appendChild(document.createTextNode("0.00"));
+                                //Grupo para informar reducao de aliquota
+                                Element gRedmunElement = document.createElement("gRed");
+                                gIBSMUN.appendChild(gRedmunElement);
+                                Element pRedmunAliElement = document.createElement("pRedAliq");
+                                gRedmunElement.appendChild(pRedmunAliElement);
+                                pRedmunAliElement.appendChild(document.createTextNode("40.00"));
+                                Element pAliEfetmunElement = document.createElement("pAliqEfet");
+                                gRedmunElement.appendChild(pAliEfetmunElement);
+                                pAliEfetmunElement.appendChild(document.createTextNode("0.00"));
+                                /////
+
+                                Element vIBSMUNElement = document.createElement("vIBSMun");
+                                gIBSMUN.appendChild(vIBSMUNElement);
+                                vIBSMUNElement.appendChild(document.createTextNode("0.00"));
+                                Element vIBSElement = document.createElement("vIBS");
+                                gIBSCBSElement.appendChild(vIBSElement);
+                                double vIBS = (ibsuf+0.00);
+                                valorExato = new BigDecimal(vIBS).setScale(2, RoundingMode.HALF_DOWN);
+                                String sIBS = String.format("%.2f", valorExato);
+                                String valIBS = sIBS.replace(",", ".");
+                                vIBSElement.appendChild(document.createTextNode(valIBS));
+                                Element gCBS = document.createElement("gCBS");
+                                gIBSCBSElement.appendChild(gCBS);
+                                Element paliCBSElement = document.createElement("pCBS");
+                                gCBS.appendChild(paliCBSElement);
+                                paliCBSElement.appendChild(document.createTextNode("0.90"));
+                                //Grupo para informar reducao de aliquota
+                                Element gRedcbsElement = document.createElement("gRed");
+                                gCBS.appendChild(gRedcbsElement);
+                                Element pRedcbsAliElement = document.createElement("pRedAliq");
+                                gRedcbsElement.appendChild(pRedcbsAliElement);
+                                pRedcbsAliElement.appendChild(document.createTextNode("40.00"));
+                                Element pAliEfetcbsElement = document.createElement("pAliqEfet");
+                                gRedcbsElement.appendChild(pAliEfetcbsElement);
+                                pAliEfetcbsElement.appendChild(document.createTextNode("0.54"));
+                                /////
+
+                                Element vCBSElement = document.createElement("vCBS");
+                                gCBS.appendChild(vCBSElement);
+                                double vCBS = (baseibscbs / 100 * 0.54);
+                                valorExato = new BigDecimal(vCBS).setScale(2, RoundingMode.HALF_DOWN);
+                                String sCBS = String.format("%.2f", valorExato);
+                                String valCBS = sCBS.replace(",", ".");
+                                vCBSElement.appendChild(document.createTextNode(valCBS));
+                                if (baseibscbs > 0) { //se o valor for maior que zero, informar total do DF-e
+                                    Element totDFeElement = document.createElement("vTotDFe");
+                                    impElement.appendChild(totDFeElement);
+                                    totDFeElement.appendChild(document.createTextNode(valBase));
+                                }
+
 
 
                                 //infAdFisco 2 Informações adicionais de interesse do Fisco???
@@ -4707,6 +5285,14 @@ public class ViaActivity extends AppCompatActivity {
                                             dbbpe.Atualizar_Campo_Bpe(IDBPE, "Pagmto", stippag);
                                             dbbpe.Atualizar_Campo_Bpe(IDBPE, "Nidpag", sidtrs);
                                         } //Vale Transporte
+
+                                        if (spagmobi.equals("PIX")) {
+                                            stippag = "06";
+                                            String sidtrs = GuardaID;
+                                            tpagElement.appendChild(document.createTextNode(stippag));
+                                            dbbpe.Atualizar_Campo_Bpe(IDBPE, "Pagmto", stippag);// SALVA NO Banco o tipo de pagamento
+                                            dbbpe.Atualizar_Campo_Bpe(IDBPE, "Nidpag", sidtrs);
+                                        } //PIX
                                     }
                                 }
 
@@ -4889,6 +5475,7 @@ public class ViaActivity extends AppCompatActivity {
                     if (smodimp.equals("01")) {
                         Imprime_BPe(); //SUNMI
                         int iqtd = GuardaQtd;
+                        System.out.println("Gerar XML II GuardaQtd: "+iqtd);
                         if (iqtd > 1) {
                             iqtd = (iqtd - 1);
                             GuardaQtd = iqtd;
@@ -4899,6 +5486,7 @@ public class ViaActivity extends AppCompatActivity {
                     } else if (smodimp.equals("03")) {
                         Imprime_BPe_BT(); //ARNY SP5 Bluetooth
                         int iqtd = GuardaQtd;
+                        System.out.println("Gerar XML modimp = 03 GuardaQtd: "+iqtd);
                         if (iqtd > 1) {
                             iqtd = (iqtd - 1);
                             GuardaQtd = iqtd;
@@ -6121,7 +6709,7 @@ public class ViaActivity extends AppCompatActivity {
             try {
 
                 if (printerBluetooth == null)
-                    acharPrinterBluetooth();
+                    tryEnableBluetooth();
                 if (printerBluetooth == null)
                     return;
 
@@ -6505,6 +7093,9 @@ public class ViaActivity extends AppCompatActivity {
                                             if (stpag.equals("05")) {
                                                 sforpag = "VALE TRANSPORTE";
                                             }
+                                            if (stpag.equals("06")) {
+                                                sforpag = "PIX";
+                                            }
                                             if (stpag.equals("99")) {
                                                 sforpag = "OUTROS";
                                             }
@@ -6705,30 +7296,15 @@ public class ViaActivity extends AppCompatActivity {
 
     }
 
-    //DTS2500
-    public void testPrint() {
-        Log.d(TAG, "Iniciando teste de impressão");
-        if (!printfManager.isConnect()) {
-            Log.e(TAG, "Impressora não conectada");
-            Toast.makeText(this, "Erro: Impressora não conectada", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        List<PrintfManager.PrintCommand> commands = new ArrayList<>();
-        commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Teste DTS-2500", 1));
-        commands.add(new PrintfManager.PrintCommand("C", "S", "B", "Linha em negrito", 2));
-        try {
-            printfManager.printBufferedText(commands);
-            Log.d(TAG, "Teste de impressão enviado");
-            Toast.makeText(this, "Teste enviado", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "Erro no teste de impressão: " + e.getMessage(), e);
-            Toast.makeText(this, "Erro no teste: " + e.toString(), Toast.LENGTH_LONG).show();
-        }
-    }
+
     @SuppressLint("MissingPermission")
     public void Imprime_BPe_DTS()  {
         if (printfManager == null) {
-            PrintfBlueListActivity.startActivity(ViaActivity.this);
+            Intent myIntent = new Intent(ViaActivity.this, PrintfBlueListActivity.class);
+            Bundle bundle = new Bundle();
+            bundle.putString("USUARIO", Nome_user);
+            myIntent.putExtras(bundle);
+            resultadoActivity.launch(myIntent);
         }
 
         String chaveBPe = Guarda_Texto;
@@ -6876,8 +7452,8 @@ public class ViaActivity extends AppCompatActivity {
                                             String sHora = sdatemb.substring(11, (16));
 
                                             commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Origem: "+sOrigem, 1));
-                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Destino: "+sDestino, 2));
-                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Data: "+sdEmb+" | Horario:"+sHora, 2));
+                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Destino: "+sDestino, 1));
+                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Data: "+sdEmb+" | Horario:"+sHora, 1));
 
 
                                             NodeList nodepassageiro = doc.getElementsByTagName("infPassageiro");
@@ -7058,6 +7634,9 @@ public class ViaActivity extends AppCompatActivity {
                                                 if (stpag.equals("05")) {
                                                     sforpag = "VALE TRANSPORTE";
                                                 }
+                                                if (stpag.equals("06")) {
+                                                    sforpag = "PIX";
+                                                }
                                                 if (stpag.equals("99")) {
                                                     sforpag = "OUTROS";
                                                 }
@@ -7076,7 +7655,7 @@ public class ViaActivity extends AppCompatActivity {
                                             }
                                             commands.add(new PrintfManager.PrintCommand("L", "N", "N", "FORMA DE PAGAMENTO    VALOR PAGO", 1));
                                             String sdinheiro = sforpag + sespaco + valorpgto;
-                                            commands.add(new PrintfManager.PrintCommand("L", "N", "N", sdinheiro, 1));
+                                            commands.add(new PrintfManager.PrintCommand("L", "N", "N", sdinheiro, 2));
 
                                         }
                                         NodeList nodeimp = doc.getElementsByTagName("imp");
@@ -7161,7 +7740,7 @@ public class ViaActivity extends AppCompatActivity {
                                             Element infprotElement = (Element) ninfprot;
                                             String sprot = infprotElement.getElementsByTagName("nProt").item(0).getTextContent();
                                             String sdataut = infprotElement.getElementsByTagName("dhRecbto").item(0).getTextContent();
-                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Protocolo de Autorizaçca: "+sprot, 1));
+                                            commands.add(new PrintfManager.PrintCommand("C", "N", "N", "Protocolo de Autorizacao: "+sprot, 1));
                                             //outputStream.write(EscPosBase.nextLine());
                                             //outputStream.write("Data de Autorizacao: ".getBytes(StandardCharsets.UTF_8));
 
@@ -7184,7 +7763,7 @@ public class ViaActivity extends AppCompatActivity {
                                 String sQRcode = sgQRcode;
                                 if (stpEmis.equals("2")) {
                                     try {
-                                        printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(sQRcode, 300));
+                                        printfManager.printf_QRcode("A", "C", PrinterConverter.QRCodeDataToBytes(sQRcode, 250));
                                     } catch (PrinterConverter.PrinterException e) {
                                         Log.e(TAG, "Erro ao imprimir QR-Code", e);
                                     }
@@ -7196,8 +7775,8 @@ public class ViaActivity extends AppCompatActivity {
                                         Log.e(TAG, "Erro ao imprimir QR-Code", e);
                                     }
                                 }
+                                sleep(50);
                                 List<PrintfManager.PrintCommand> commands2 = new ArrayList<>();
-                                commands2.add(new PrintfManager.PrintCommand("L", "S", "N", "", 2));
                                 String stottrib = sgtottrib;
                                 if (stottrib != "") {
                                     stottrib = stottrib.replace(".", ",");
@@ -7443,7 +8022,8 @@ public class ViaActivity extends AppCompatActivity {
                 Imprime_Cancel_BT(snum); //ARNY
             } else if (smodimp.equals("05")) {
                 //BLUETOOTH DTS-2500
-                Imprime_BPe_DTS();
+                initData();
+                Imprime_Cancel_DTS(snum);
             }
             infMensagens("Bilhete Cancelado com Sucesso!", "");
 
@@ -7611,6 +8191,7 @@ public class ViaActivity extends AppCompatActivity {
         Bundle bundle = new Bundle();
         bundle.putString("USUARIO", Nome_user);
         bundle.putString("Activity_Dados", "15");
+        myIntent.putExtras(bundle);
         startForresult.launch(myIntent);
 
     }

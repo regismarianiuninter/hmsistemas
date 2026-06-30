@@ -158,6 +158,14 @@ public class Bpe_Consulta extends BaseAdapter {
             btnImprimir.setText("");
             btnCancelar.setText("");
         }
+        if (ssit.equals("PP")) { //Pix Pendente de
+            sstatus = "PIX PENDENTE";
+            txtStatus.setTextColor(Color.RED);
+            btnImprimir.setEnabled(false);
+            btnCancelar.setEnabled(false);
+            btnImprimir.setText("");
+            btnCancelar.setText("");
+        }
         txtStatus.setText(sstatus);
 
 

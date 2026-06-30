@@ -94,6 +94,12 @@
                     android:layout_height="wrap_content"
                     android:text="Consulta Usuário"/>
 
+                <Button
+                    android:id="@+id/btnQrCodeSanitarios"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="QrCode sanitarios"/>
+
         </LinearLayout>
 
 

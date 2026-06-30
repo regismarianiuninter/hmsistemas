@@ -19,7 +19,7 @@ public class DB_EMP extends SQLiteOpenHelper {
     /** O nome do arquivo de base de dados no sistema de arquivos */
     private static final String NOME_BD = "EMP";
     /** A versão da base de dados que esta classe compreende. */
-    private static final int VERSAO_BD = 23;
+    private static final int VERSAO_BD = 28;
     private static final String LOG_TAG = "EMP";
     /** Mantém rastreamento do contexto que nós podemos carregar SQL */
     private final Context contexto;
@@ -79,6 +79,27 @@ public class DB_EMP extends SQLiteOpenHelper {
             else if (oldVersion < 23) {
                 db.execSQL("ALTER TABLE EMP ADD COLUMN Ndstax TEXT DEFAULT ''");
             }
+            else if (oldVersion < 24) {
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Nomimp TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Codimp TEXT DEFAULT ''");
+            }
+            else if (oldVersion < 25) {
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Cliidb TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Clisec TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Bancrt TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Bansen TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Banchv TEXT DEFAULT ''");
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Banwse TEXT DEFAULT ''");
+            }
+            else if (oldVersion < 26) {
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Idepdv TEXT DEFAULT ''");
+            }
+            else if (oldVersion < 27) {
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Basemb TEXT DEFAULT ''");
+            }
+            else if (oldVersion < 28) {
+                db.execSQL("ALTER TABLE EMP ADD COLUMN Agencia TEXT DEFAULT ''");
+            }
         }
     }
 
@@ -112,7 +133,9 @@ public class DB_EMP extends SQLiteOpenHelper {
                            String cidade, String uf, String codmun, String cep, String fone, String email, String codTar, String tipamb,
                            String modelo, String serie, String ultbil, String tipemi, String tipbil, String datctg, String cnae, String empspl,
                            String aliicm, String urlqrc, String crtemp, String crtsen, String alitri, String maximp, String convei, String pvenda, String endews,
-                           String rsv001, String rsv002, String rsv003, String modimp, String ultdat, String cartao, String basseg, String naokey, String mincan, String ultqrc, String ndstax)
+                           String rsv001, String rsv002, String rsv003, String modimp, String ultdat, String cartao, String basseg, String naokey, String mincan,
+                           String ultqrc, String ndstax, String nomimp, String codimp, String cliidb, String clisec, String banctr, String bansen, String banchv,
+                           String banwse, String idepdv, String basemb, String agencia)
 
 
 
@@ -166,6 +189,18 @@ public class DB_EMP extends SQLiteOpenHelper {
             initialValues.put("Mincan", mincan);
             initialValues.put("Ultqrc", ultqrc);
             initialValues.put("Ndstax", ndstax);
+            initialValues.put("Nomimp", nomimp);
+            initialValues.put("Codimp", codimp);
+            initialValues.put("Cliidb", cliidb);
+            initialValues.put("Clisec", clisec);
+            initialValues.put("Bancrt", banctr);
+            initialValues.put("Bansen", bansen);
+            initialValues.put("Banchv", banchv);
+            initialValues.put("Banwse", banwse);
+            initialValues.put("Idepdv", idepdv);
+            initialValues.put("Basemb", basemb);
+            initialValues.put("Agencia", agencia);
+
 
             return db.insert("EMP", null, initialValues);
         }
@@ -186,7 +221,8 @@ public class DB_EMP extends SQLiteOpenHelper {
                               String modelo, String serie, String ultbil, String tipemi, String tipbil, String datctg, String cnae, String empspl,
                               String aliicm, String urlqrc, String crtemp, String crtsen, String alitri, String maximp, String convei, String pvenda, String endews,
                               String rsv001, String rsv002, String rsv003, String modimp, String ultdat, String cartao, String basseg, String naokey, String mincan,
-                              String ultqrc, String ndstax) {
+                              String ultqrc, String ndstax, String nomimp, String codimp, String cliidb, String clisec, String banctr, String bansen, String banchv,
+                              String banwse, String idepdv, String basemb, String agencia) {
         SQLiteDatabase db = this.getReadableDatabase();
 
         ContentValues valores = new ContentValues();
@@ -237,6 +273,17 @@ public class DB_EMP extends SQLiteOpenHelper {
         valores.put("Mincan", mincan);
         valores.put("Ultqrc", ultqrc);
         valores.put("Ndstax", ndstax);
+        valores.put("Nomimp", nomimp);
+        valores.put("Codimp", codimp);
+        valores.put("Cliidb", cliidb);
+        valores.put("Clisec", clisec);
+        valores.put("Bancrt", banctr);
+        valores.put("Bansen", bansen);
+        valores.put("Banchv", banchv);
+        valores.put("Banwse", banwse);
+        valores.put("Idepdv", idepdv);
+        valores.put("Basemb", basemb);
+        valores.put("Agencia", agencia);
 
         getWritableDatabase().update("EMP", valores, "id=?", argumentos);
     }
@@ -327,6 +374,17 @@ public class DB_EMP extends SQLiteOpenHelper {
         public String getMincan(){ return getString(getColumnIndexOrThrow("Mincan"));}
         public String getUltqrc(){ return getString(getColumnIndexOrThrow("Ultqrc"));}
         public String getNdstax(){ return getString(getColumnIndexOrThrow("Ndstax"));}
+        public String getNomimp(){ return getString(getColumnIndexOrThrow("Nomimp"));}
+        public String getCodimp(){ return getString(getColumnIndexOrThrow("Codimp"));}
+        public String getCliidb(){ return getString(getColumnIndexOrThrow("Cliidb"));}
+        public String getClisec(){ return getString(getColumnIndexOrThrow("Clisec"));}
+        public String getBancrt(){ return getString(getColumnIndexOrThrow("Bancrt"));}
+        public String getBansen(){ return getString(getColumnIndexOrThrow("Bansen"));}
+        public String getBanchv(){ return getString(getColumnIndexOrThrow("Banchv"));}
+        public String getBanwse(){ return getString(getColumnIndexOrThrow("Banwse"));}
+        public String getIdepdv(){ return getString(getColumnIndexOrThrow("Idepdv"));}
+        public String getBasemb(){ return getString(getColumnIndexOrThrow("Basemb"));}
+        public String getAgencia(){ return getString(getColumnIndexOrThrow("Agencia"));}
 
 
     }

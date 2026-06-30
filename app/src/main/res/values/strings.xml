@@ -15,23 +15,29 @@
     <string name="DB_TRE_onCreate">CREATE TABLE Trechos (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, UF TEXT, Codmun TEXT); </string>
     <string name="DB_TRE_onUpgrade">"DROP TABLE IF EXISTS Trechos </string>
     <string name="DB_EMP_onCreate">CREATE TABLE EMP (ID INTEGER PRIMARY KEY AUTOINCREMENT, Cnpj TEXT, Descri TEXT, Insest TEXT, Insmun TEXT, Codcrt TEXT,
-        Endere TEXT, Numero TEXT, Bairro TEXT, Cidade TEXT, UF TEXT, Codmun TEXT, CEP TEXT, Fone TEXT, Email, CodTar TEXT, Tipamb TEXT,
+        Endere TEXT, Numero TEXT, Bairro TEXT, Cidade TEXT, UF TEXT, Codmun TEXT, CEP TEXT, Fone TEXT, Email TEXT, CodTar TEXT, Tipamb TEXT,
         Modelo TEXT, Serie TEXT, Ultbil TEXT, Tipemi TEXT, Tipbil TEXT, Datctg TEXT, Cnae TEXT, Empspl TEXT, Aliicm Text, Urlqrc TEXT, Crtemp TEXT, Crtsen TEXT,
         Alitri TEXT, Maximp INTEGER, Convei TEXT, Pvenda TEXT, Endews TEXT, Rsv001 TEXT, Rsv002 TEXT, Rsv003 TEXT, Modimp TEXT, Ultdat TEXT, Cartao TEXT, Basseg TEXT,
-        Naokey TEXT, Mincan TEXT, Ultqrc TEXT, Ndstax TEXT); </string>
+        Naokey TEXT, Mincan TEXT, Ultqrc TEXT, Ndstax TEXT, Nomimp TEXT, Codimp TEXT, Cliidb TEXT, Clisec TEXT, Bancrt TEXT, Bansen TEXT, Banchv TEXT, Banwse TEXT,
+        Idepdv TEXT, Basemb TEXT, Agencia TEXT); </string>
     <string name="DB_EMP_onUpgrade">"DROP TABLE IF EXISTS EMP </string>
     <string name="DB_BPE_onCreate">CREATE TABLE BPE (ID INTEGER PRIMARY KEY AUTOINCREMENT, Modser TEXT, Numbpe TEXT, Datemi TEXT, Chvbpe TEXT, Sitbpe TEXT, Agente TEXT, Tippas TEXT,
         Vlrpas DECIMAL, Nomvia TEXT, Treori TEXT, Tredes TEXT, Qtdimp INTEGER, Transf TEXT, Rsv001 TEXT, Rsv002 TEXT, Rsv003 TEXT, Codlin TEXT, Codori TEXT, Coddes TEXT, Datsai TEXT,
         Numcad TEXT, Vlrtar TEXT, Vlremb TEXT, Vlrseg TEXT, Vlrarr TEXT, Codvei TEXT, Pagmto TEXT, Codban TEXT, Codaut TEXT, Nidpag TEXT); </string>
     <string name="DB_BPE_onUpgrade">"DROP TABLE IF EXISTS BPE </string>
-    <string name="DB_USR_onCreate">CREATE TABLE USR (ID INTEGER PRIMARY KEY AUTOINCREMENT, Usrnom TEXT, Usrsen TEXT, Fectur TEXT, Ultatu TEXT); </string>
+    <string name="DB_USR_onCreate">CREATE TABLE USR (ID INTEGER PRIMARY KEY AUTOINCREMENT, Usrnom TEXT, Usrsen TEXT, Fectur TEXT, Ultatu TEXT, Tippvd TEXT); </string>
     <string name="DB_USR_onUpgrade">"DROP TABLE IF EXISTS USR </string>
     <string name="DB_LIN_onCreate">CREATE TABLE LIN (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Prefix TEXT); </string>
     <string name="DB_LIN_onUpgrade">"DROP TABLE IF EXISTS LIN </string>
-    <string name="DB_TMP_onCreate">CREATE TABLE TMP (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Agente TEXT, Datemi TEXT, Qqtbil INTEGER, Vlrtot DECIMAL, Vlrvale DECIMAL, Vlrembd DECIMAL, Vlrembo DECIMAL); </string>
+    <string name="DB_TMP_onCreate">CREATE TABLE TMP (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Agente TEXT, Datemi TEXT, Qqtbil INTEGER, Vlrtot DECIMAL, Vlrvale DECIMAL, Vlrembd DECIMAL,
+        Vlrembo DECIMAL, Vlrpix DECIMAL, Vlrembp DECIMAL); </string>
     <string name="DB_TMP_onUpgrade">"DROP TABLE IF EXISTS TMP </string>
     <string name="DB_GRA_onCreate">CREATE TABLE GRA (ID INTEGER PRIMARY KEY AUTOINCREMENT, Cpfpas TEXT, Nompas TEXT, Docpas TEXT, Linha TEXT, Sentido TEXT, Tipgra TEXT, Tipdes TEXT, Mesano TEXT, Qtdpas TEXT, Qtdmes TEXT, Qtdlin TEXT); </string>
     <string name="DB_GRA_onUpgrade">"DROP TABLE IF EXISTS GRA </string>
+    <string name="DB_SER_onCreate">CREATE TABLE SER (ID INTEGER PRIMARY KEY AUTOINCREMENT, Tipser TEXT, Vlrser TEXT); </string>
+    <string name="DB_SER_onUpgrade">"DROP TABLE IF EXISTS SER </string>
+    <string name="DB_TKT_onCreate">CREATE TABLE TICKET (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Chvtkt TEXT, Dathor TEXT, Tipser TEXT, Vlrtkt TEXT, Forpag TEXT, Terminal TEXT, Usuario TEXT, Codope TEXT, Sincser TEXT, Status TEXT); </string>
+    <string name="DB_TKT_onUpgrade">"DROP TABLE IF EXISTS TICKET </string>
     <string name="title_activity_via">ViaActivity</string>
     <string name="title_activity_tre">TreActivity</string>
     <string name="title_activity_edita">EmpActivity</string>
@@ -80,13 +86,21 @@
         <item>04 - ARNY AIDL</item>
         <item>05 - DTS-2500</item>
     </string-array>
+    <string-array name="formas_array">
+        <item>01 - VALE TRANSPORTE</item>
+        <item>02 - PIX</item>
+    </string-array>
+    <string-array name="service_types">
+        <item>1 - Sanitários</item>
+        <item>2 - Ducha</item>
+    </string-array>
     <string name="title_activity_parametros">ParametrosActivity</string>
     <string name="title_activity_encerra">EncerraActivity</string>
     <string name="title_activity_cancela_pagamento">CancelaPagamentoActivity</string>
     <string name="title_activity_cielo">CieloActivity</string>
     <string name="TEST">Test Receipt</string>
     <string name="godown_keeper">Keeper: John Doe</string>
-    <string name="send_printer">Printer: AR-2500</string>
+    <string name="send_printer">Impressora: DTS-2500</string>
     <string name="new_and_select_label">Criar ou selecionar etiqueta</string>
     <string name="no_connect_blue_tooth">Bluetooth não conectado</string>
     <string name="new_label">Nova etiqueta</string>
@@ -311,8 +325,8 @@
     <string name="time">Hora</string>
     <string name="type">Tipo</string>
     <string name="number">Quantidade</string>
-    <string name="price">Preço</string>
-    <string name="remarks">Observações:</string>
+    <string name="price">Preco</string>
+    <string name="remarks">Observacoes:</string>
     <string name="test_80_receipt">Testar recibo de 80mm</string>
     <string name="test_58_receipt">Testar recibo de 58mm</string>
     <string name="label_name_title">Nome da Etiqueta</string>

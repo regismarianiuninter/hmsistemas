@@ -361,7 +361,7 @@ public class EditaActivity extends AppCompatActivity {
         edt03.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Usrsen"));
         edt04.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Fectur"));
         edt05.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Ultatu"));
-        edt06.setText("");
+        edt06.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Tippvd"));
 
     }
 
@@ -459,17 +459,18 @@ public class EditaActivity extends AppCompatActivity {
         EditText edt04 = findViewById(R.id.edt04);
         EditText edt05 = findViewById(R.id.edt05);
         EditText edt06 = findViewById(R.id.edt06);
-        String sID, snome, ssenha, sfectur, sultatu;
+        String sID, snome, ssenha, sfectur, sultatu, tippvd;
         sID = edt01.getText().toString();
         snome = edt02.getText().toString();
         ssenha = edt03.getText().toString();
         snome = snome.toUpperCase();
         sfectur = edt04.getText().toString();
         sultatu = edt05.getText().toString();
+        tippvd = edt06.getText().toString();
 
 
         DB_USR dbu = new DB_USR(this);
-        dbu.Atualizar_Usr(sID,snome,ssenha,sfectur,sultatu);
+        dbu.Atualizar_Usr(sID,snome,ssenha,sfectur,sultatu, tippvd);
     }
 
 
@@ -502,19 +503,22 @@ public class EditaActivity extends AppCompatActivity {
         EditText edt02 = findViewById(R.id.edt02);
         EditText edt03 = findViewById(R.id.edt03);
         EditText edt04 = findViewById(R.id.edt04);
+        EditText edt06 = findViewById(R.id.edt05);
 
-        String snome, ssenha, sfectur;
+        String snome, ssenha, sfectur, tippvd;
         snome = edt02.getText().toString();
         ssenha = edt03.getText().toString();
         snome = snome.toUpperCase();
         sfectur = edt04.getText().toString();
+        tippvd = edt06.getText().toString();
 
         DB_USR dbu = new DB_USR(this);
-        dbu.InserirUsr(snome,ssenha,sfectur, "");
+        dbu.InserirUsr(snome,ssenha,sfectur, "", tippvd);
 
         edt02.setText("");
         edt03.setText("");
         edt04.setText("");
+        edt06.setText("");
     }
 
 }

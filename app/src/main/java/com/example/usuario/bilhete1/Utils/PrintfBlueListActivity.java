@@ -70,6 +70,7 @@ public class PrintfBlueListActivity extends Activity {
     private LinearLayout ll_blue_list_already_paired,ll_blue_list_unpaired;
     private Button btbimp;
     private List<Mode> listData;
+    private static String Nome_user = "";
 
     /**
      * 是否打开了配对
@@ -81,6 +82,10 @@ public class PrintfBlueListActivity extends Activity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_printf_blue_list);
+        Intent Newintent = getIntent();
+        Bundle bundle = Newintent.getExtras();
+        String user = bundle.getString("USUARIO");
+        Nome_user = user;
         context = this;
         initView();
         initData();
@@ -342,13 +347,14 @@ public class PrintfBlueListActivity extends Activity {
 
     public void imprimeBT(){
         if (printfManager.isConnect()){
+            String susuario = Nome_user;
             listData = new ArrayList<>();
-            listData.add(new Mode("Test-P26",200,320));
-            listData.add(new Mode("Test-P16",20,188));
+            listData.add(new Mode("Test-P26",200,0));
+            listData.add(new Mode("Test-P16",20,0));
             printfManager.printf_50(
                     this.getString(R.string.TEST),
                     this.getString(R.string.godown_keeper)
-                    ,this.getString(R.string.send_printer),listData
+                    ,this.getString(R.string.send_printer), susuario, listData
             );
         }else{
             PrintfBlueListActivity.startActivity(this);

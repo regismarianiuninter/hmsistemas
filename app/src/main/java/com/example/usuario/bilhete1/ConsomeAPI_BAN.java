@@ -1,187 +1,238 @@
 package com.example.usuario.bilhete1;
 
-import android.content.Context;
-import android.util.Base64;
-import android.util.Xml;
+import static androidx.core.content.ContextCompat.getSystemService;
 
-import org.ksoap2.SoapEnvelope;
-import org.ksoap2.serialization.SoapObject;
-import org.ksoap2.serialization.SoapSerializationEnvelope;
-import org.ksoap2.transport.HttpTransportSE;
-import org.xmlpull.v1.XmlPullParserException;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.os.Build;
+import android.util.Base64;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.StringWriter;
-import java.net.HttpURLConnection;
-import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.security.KeyStore;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 
 public class ConsomeAPI_BAN {
+    private final String baseUrl;
+    private final String pfxFilePath;
+    private final String pfxPassword;
+
+    public ConsomeAPI_BAN(String baseUrl, String pfxFilePath, String pfxPassword) {
+        this.baseUrl = baseUrl;
+        this.pfxFilePath = pfxFilePath;
+        this.pfxPassword = pfxPassword;
+    }
+
+    // Cria o JSON para a cobrança Pix
+    public JSONObject createPixChargeJson(String chave, String empresa, String sval, String txid, String sdoc) throws JSONException {
+        JSONObject json = new JSONObject();
+        json.put("chave", chave);
+        json.put("merchantName", empresa);
+        json.put("transactionAmount", sval);
+        json.put("txId", txid);
+        json.put("infoAdicional", "Referente ao documento: " + sdoc);
+        return json;
+    }
 
 
+    // Gera o client_credentials em Base64 (clientId:clientSecret)
+    public String generateClientCredentials(String clientId, String clientSecret) {
+        String credentials = clientId + ":" + clientSecret;
+        return Base64.encodeToString(credentials.getBytes(), Base64.NO_WRAP);
+    }
 
+    public SSLSocketFactory generateSSLSocketFactory() {
+        try{
+        // Configurar o KeyStore com o certificado PFX
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (FileInputStream fis = new FileInputStream(pfxFilePath)) {
+            keyStore.load(fis, pfxPassword.toCharArray());
+        }
 
-    public static String getAccessToken(String clientId, String clientSecret, String surlpd, String surltk, String scertificado, String ssenha)
-    {
-       //this.clientId = clientId;
-        Pattern pat = Pattern.compile(".*\"access_token\"\\s*:\\s*\"([^\"]+)\".*");
-        //String content = "grant_type=client_credentials&client_id=" +clientId+"&client_secret="+clientSecret;
-        String content = "grant_type=client_credentials";
-        BufferedReader reader = null;
-        HttpURLConnection connection = null;
-        String accesstoken = "";
-        try {
-            URL url = new URL(surlpd+surltk);
-            connection = (HttpURLConnection) url.openConnection();
+        // Inicializar o KeyManagerFactory
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, pfxPassword.toCharArray());
 
-            KeyStore keyStore = KeyStore.getInstance("PKCS12");
-            InputStream fis = null;
-            //File dircert = new File (getExternalFilesDir("Download").getAbsolutePath());
-            fis = new FileInputStream(scertificado);
-            keyStore.load(fis, ssenha.toCharArray());
-            X509TrustManager trustManager;
-            SSLSocketFactory sslSocketFactory;
+        // Configurar o SSLContext
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
 
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("X509");
-            kmf.init(keyStore, ssenha.toCharArray());
-            KeyManager[] keyManagers = kmf.getKeyManagers();
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(keyManagers, null, null);
-            sslSocketFactory = sslContext.getSocketFactory();
-            if(connection instanceof HttpsURLConnection) {
-                ((HttpsURLConnection)connection)
-                        .setSSLSocketFactory(sslSocketFactory);
-            }
+        return  sslContext.getSocketFactory();
 
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            String baseAuthStr = clientId + ":" + clientSecret;
-            byte[] authentication = Base64.encode(baseAuthStr.getBytes(), Base64.DEFAULT);
-            //var base64authorization = Convert.ToBase64String(Xml.Encoding.GetEncoding("ASCII").GetBytes($"{client_id}:{client_secret}"));
-            connection.setRequestProperty("Authorization", "Basic " + authentication);
-            //connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-
-            PrintStream os = new PrintStream(connection.getOutputStream());
-            os.print(content);
-            os.close();
-            reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String line = null;
-            StringWriter out = new StringWriter(connection.getContentLength() > 0 ? connection.getContentLength() : 2048);
-            while ((line = reader.readLine()) != null) {
-                out.append(line);
-            }
-            String response = out.toString();
-            Matcher matcher = pat.matcher(response);
-            if (matcher.matches() && matcher.groupCount() > 0) {
-                accesstoken = matcher.group(1);
-            }
-            connection.disconnect();
         } catch (Exception e) {
-            System.out.println("Error : " + e.toString());
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    System.out.println("IOException "+e.toString());
-                }
-            }
+            throw new RuntimeException(e);
         }
-        System.out.println("Retorno API: "+accesstoken);
-        return accesstoken;
     }
 
-    public static String geraToken(String url_padrao, String url_geratoken, String client_id, String client_secret, String dircertificado) {
-        String sret = "";
-        String access_token = "";
+    public String getAccessToken(String clientId, String clientSecret) throws Exception {
 
-        try {
-            URL url = new URL(url_padrao + url_geratoken);
-            HttpURLConnection request = (HttpURLConnection) url.openConnection();
-            request.setRequestMethod("POST");
-            request.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
-            request.setRequestProperty("Accept", "application/json");
-            request.setDoOutput(true);
+            // Gerar client_credentials
+            String clientCredentials = generateClientCredentials(clientId, clientSecret);
 
-            String postData = "grant_type=client_credentials";
-            byte[] bytes = postData.getBytes("ASCII");
-            request.setRequestProperty("Content-Length", String.valueOf(bytes.length));
-            String baseAuthStr = client_id + ":" + client_secret;
-           // String base64authorization = Base64.encodeToString((client_id + ":" + client_secret).getBytes,("ASCII"));
+            // Criar a conexão HTTPS
+            URL url = new URL(baseUrl + "/oauth/v1/access-token");
+            HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+            connection.setSSLSocketFactory(generateSSLSocketFactory());
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Basic " + clientCredentials);
+            connection.setDoOutput(true);
 
-            //String base64authorization = Base64.encodeToString(baseAuthStr.getBytes(), Base64.DEFAULT);
-            byte[] encodeValue = Base64.encode(baseAuthStr.getBytes(), Base64.DEFAULT);
-            String base64authorization  = new String(encodeValue);
-            base64authorization = base64authorization.replaceAll("\t", "");
-            base64authorization = base64authorization.replaceAll("\r", "");
-            base64authorization = base64authorization.replaceAll("\n", "");
-            request.setRequestProperty("Authorization", "Basic " + base64authorization);
-
-            // Load the certificate
-            KeyStore keyStore = KeyStore.getInstance("PKCS12");
-            try (FileInputStream keyStoreStream = new FileInputStream(dircertificado)) {
-                keyStore.load(keyStoreStream, "@HMinfo@0824".toCharArray());
-               // keyStore.load(keyStoreStream, "@HMinfo@0824".toCharArray());
+            // Enviar o corpo da requisição
+            String requestBody = "{\"grant_type\": \"client_credentials\"}";
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = requestBody.getBytes("utf-8");
+                os.write(input, 0, input.length);
             }
 
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init(keyStore);
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
-
-            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
-            if(request instanceof HttpsURLConnection) {
-                ((HttpsURLConnection)request)
-                        .setSSLSocketFactory(sslSocketFactory);
-            }
-
-
-            try (OutputStream os = request.getOutputStream()) {
-                os.write(bytes);
-            } catch (Exception e) {
-                sret = e.toString();
-            }
-
-            try (BufferedReader streamReader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
-                StringBuilder result = new StringBuilder();
-                String line;
-                while ((line = streamReader.readLine()) != null) {
-                    result.append(line);
+            // Ler a resposta
+            int responseCode = connection.getResponseCode();
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(
+                            responseCode >= 200 && responseCode < 300
+                                    ? connection.getInputStream()
+                                    : connection.getErrorStream()))) {
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
                 }
-                String sval = result.toString().replace("null", "0");
-                //ObjectMapper objectMapper = new ObjectMapper();
-                //Ret_Key token = objectMapper.readValue(sval, Ret_Key.class);
-                //access_token = token.access_token;
-                sret = sval;
             }
 
-        } catch (Exception ex) {
-            sret = ex.getMessage();
-            return ex.getMessage();
+            connection.disconnect();
+
+            if (responseCode >= 200 && responseCode < 300) {
+                // Parsear o JSON e extrair o access_token
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                return jsonResponse.getString("access_token");
+            } else {
+                throw new RuntimeException("Erro na requisição getAccessToken: " + responseCode + " - " + response.toString());
+            }
+
+    }
+
+    public String getQrcodePix(String accessToken, String chave, String nomeEmpresa,String sval, String txId, String numeroPassagem) throws Exception{
+
+        // Criar o JSON da requisição
+        JSONObject jsonBody = createPixChargeJson(chave, nomeEmpresa, sval, txId, numeroPassagem);
+
+        // Criar a conexão HTTPS
+        URL url = new URL(baseUrl + "/pix-qrcode-cobranca/v1/qr-code/estatico/gerar");
+        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+        connection.setSSLSocketFactory(generateSSLSocketFactory());
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setRequestProperty("Authorization", "Bearer " + accessToken);
+        connection.setDoOutput(true);
+
+        // Enviar o corpo da requisição
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = jsonBody.toString().getBytes("utf-8");
+            os.write(input, 0, input.length);
         }
 
-        return sret;
+        // Ler a resposta
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(
+                        responseCode >= 200 && responseCode < 300
+                                ? connection.getInputStream()
+                                : connection.getErrorStream()))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        connection.disconnect();
+
+        if (responseCode >= 200 && responseCode < 300) {
+            // Parsear o JSON e extrair qrCodeText
+            JSONObject jsonResponse = new JSONObject(response.toString());
+            return jsonResponse.getString("qrCodeText");
+        } else {
+            throw new RuntimeException("Erro na requisição getQrcodePix: " + responseCode + " - " + response);
+        }
     }
 
 
+
+    // Consulta o status de uma cobrança Pix
+    public String consultarPix(String accessToken, String txid, Date qrCodeDate) throws Exception {
+        // Formatar inicio e fim com base na data do QR code
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        String dateStr = sdf.format(qrCodeDate);
+        String inicio = dateStr.substring(0, 11) + "00:00:00.000Z";
+        String fim = dateStr.substring(0, 11) + "23:59:59.000Z";
+
+        // Montar a URL de consulta
+        String urlConsulta = String.format("/pix-qrcode-cobranca/v1/pix?inicio=%s&fim=%s&txid=%s", inicio, fim, txid);
+
+        // Configurar o KeyStore com o certificado PFX
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (FileInputStream fis = new FileInputStream(pfxFilePath)) {
+            keyStore.load(fis, pfxPassword.toCharArray());
+        }
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, pfxPassword.toCharArray());
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+
+        // Criar a conexão HTTPS
+        URL url = new URL(baseUrl + urlConsulta);
+        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+        connection.setSSLSocketFactory(sslContext.getSocketFactory());
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Authorization", "Bearer " + accessToken);
+
+        // Ler a resposta
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(
+                        responseCode >= 200 && responseCode < 300
+                                ? connection.getInputStream()
+                                : connection.getErrorStream()))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        connection.disconnect();
+
+        if (responseCode >= 200 && responseCode < 300) {
+            JSONObject jsonResponse = new JSONObject(response.toString());
+            if (jsonResponse.has("pix")) {
+                JSONArray pixArray = jsonResponse.getJSONArray("pix");
+                if (pixArray.length() > 0) {
+                    JSONObject pix = pixArray.getJSONObject(0);
+                    String responseTxid = pix.getString("txid");
+                    if (txid.equals(responseTxid)) {
+                        return "CONCLUIDA";
+                    }
+                }
+            }
+            return "PENDENTE"; // Nenhuma transação encontrada ou txid não corresponde
+        } else {
+            throw new RuntimeException("Erro na requisição: " + responseCode + " - " + response.toString());
+        }
+    }
 }
