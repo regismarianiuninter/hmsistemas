@@ -856,7 +856,7 @@ public class ActivityConfig extends AppCompatActivity {
                                                             String snome = ageElement.getElementsByTagName("sNome").item(0).getTextContent();
                                                             String ssenha = ageElement.getElementsByTagName("sSenha").item(0).getTextContent();
                                                             String sfectur = ageElement.getElementsByTagName("sFectur").item(0).getTextContent();
-                                                            dbusr.InserirUsr(snome, ssenha, sfectur, "", "");
+                                                            dbusr.InserirUsr(snome, ssenha, sfectur, "", "", "");
 
 
                                                         }

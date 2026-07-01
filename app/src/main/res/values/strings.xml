@@ -25,7 +25,7 @@
         Vlrpas DECIMAL, Nomvia TEXT, Treori TEXT, Tredes TEXT, Qtdimp INTEGER, Transf TEXT, Rsv001 TEXT, Rsv002 TEXT, Rsv003 TEXT, Codlin TEXT, Codori TEXT, Coddes TEXT, Datsai TEXT,
         Numcad TEXT, Vlrtar TEXT, Vlremb TEXT, Vlrseg TEXT, Vlrarr TEXT, Codvei TEXT, Pagmto TEXT, Codban TEXT, Codaut TEXT, Nidpag TEXT); </string>
     <string name="DB_BPE_onUpgrade">"DROP TABLE IF EXISTS BPE </string>
-    <string name="DB_USR_onCreate">CREATE TABLE USR (ID INTEGER PRIMARY KEY AUTOINCREMENT, Usrnom TEXT, Usrsen TEXT, Fectur TEXT, Ultatu TEXT, Tippvd TEXT); </string>
+    <string name="DB_USR_onCreate">CREATE TABLE USR (ID INTEGER PRIMARY KEY AUTOINCREMENT, Usrnom TEXT, Usrsen TEXT, Fectur TEXT, Ultatu TEXT, Tippvd TEXT, Atuusr TEXT); </string>
     <string name="DB_USR_onUpgrade">"DROP TABLE IF EXISTS USR </string>
     <string name="DB_LIN_onCreate">CREATE TABLE LIN (ID INTEGER PRIMARY KEY AUTOINCREMENT, Codigo TEXT, Descri TEXT, Prefix TEXT); </string>
     <string name="DB_LIN_onUpgrade">"DROP TABLE IF EXISTS LIN </string>

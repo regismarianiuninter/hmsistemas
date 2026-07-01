@@ -46,6 +46,7 @@ public class LoginActivity extends AppCompatActivity {
     private static String Nome_user = "";
 
     private static String Novo_Usuario = "";
+    private static boolean Atualizando_Usuarios = false;
     private static android.app.AlertDialog alert;
 
 
@@ -67,11 +68,13 @@ public class LoginActivity extends AppCompatActivity {
                 String ssenha = edtSenha.getText().toString();
                 suser = suser.toUpperCase();
                 Novo_Usuario = "";
+                Atualizando_Usuarios = false;
                 if (!suser.equals("")) {
                     String sUsuario = "";
                     DB_USR dbu = new DB_USR(LoginActivity.this);
                     DB_USR.UsrCursor cursor = dbu.RetornarUsr(DB_USR.UsrCursor.OrdenarPor.NomeCrescente);
                     String sOK = "";
+                    String satuusr = "";
                     for( int i=0; i <cursor.getCount(); i++)
                     {
                         cursor.moveToPosition(i);
@@ -81,6 +84,7 @@ public class LoginActivity extends AppCompatActivity {
                                 String usrsen = cursor.getUsrsen();
                                 if (ssenha.equals(usrsen)) { //Senha Confere
                                     sOK = "S";
+                                    satuusr = cursor.getAtuusr();
                                     DB_EMP dbemplog = new DB_EMP(LoginActivity.this);
                                     if (!sUsuario.equals("HMINFO")) { //primeiro acesso provoca erro
                                         if (sUsuario.equals("CAIXA")) { //se for usuario caixa marca ponto de venda como Rodoviaria
@@ -98,7 +102,11 @@ public class LoginActivity extends AppCompatActivity {
                     if (sOK.equals("S")){ //se Usuario e senha estao corretos
                         if (!suser.equals("HMINFO") && !suser.equals("CIELO")) {
                             Nome_user = suser;
-                            Atualizacoes(suser);
+                            if ("S".equals(satuusr)) {
+                                confirmarAtualizacaoUsuarios();
+                            } else {
+                                Atualizacoes(suser);
+                            }
                         } else {
                             Intent it = getIntent();
 
@@ -144,6 +152,42 @@ public class LoginActivity extends AppCompatActivity {
     }
 
 
+    private void confirmarAtualizacaoUsuarios() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Atualizar usuarios")
+                .setMessage("Deseja consultar novos usuarios no servidor?")
+                .setPositiveButton("Sim", (d, w) -> {
+                    Atualizando_Usuarios = true;
+                    Novo_Usuario = Nome_user;
+                    Atualizacoes(Nome_user);
+                })
+                .setNegativeButton("Nao", (d, w) -> {
+                    Atualizando_Usuarios = false;
+                    Novo_Usuario = "";
+                    Atualizacoes(Nome_user);
+                })
+                .show();
+    }
+
+    private void finalizarLogin(String usuario) {
+        Intent it = getIntent();
+
+        it.putExtra("user", usuario);
+        it.putExtra("Activity_Dados", "0");
+
+        setResult(RESULT_OK, it);
+        finish();
+    }
+
+    private void avisarUsuariosIncluidos(final int incluidos) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(LoginActivity.this, "Usuarios novos incluidos: " + incluidos, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
     private void ExecutBackgrund() {
         ExecutorService server =  Executors.newSingleThreadExecutor();
         server.execute(new Runnable() {
@@ -168,8 +212,7 @@ public class LoginActivity extends AppCompatActivity {
                     sultatu = dbu.Busca_Dados_Usr(susr, "Ultatu");
                     sidU = dbu.Busca_Dados_Usr(susr, "ID");
                 }
-                String snomouser = Novo_Usuario;
-                if (snomouser.equals("")) {
+                if (!Atualizando_Usuarios) {
                     String sret = Busca_Atualizacoes(sendews, LoginActivity.this);
                     if (!sret.equals("")) {
                         sret = sret.replace("m:", "");
@@ -496,6 +539,7 @@ public class LoginActivity extends AppCompatActivity {
                             if (!sret.equals("")) { // so entra se retornou xml do ws
                                 try {
                                     String spassou = "";
+                                    int usuariosIncluidos = 0;
                                     DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
                                     DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
                                     File fXmlFile = new File(getExternalFilesDir("Download").getAbsolutePath() + "/RetAtualiza_Usr.xml");
@@ -516,31 +560,27 @@ public class LoginActivity extends AppCompatActivity {
                                                 //////////////////////////////////////////////
                                                 /////PROCURAR USUARIOS
                                                 DB_USR dbuser = new DB_USR(LoginActivity.this);
-                                                dbuser.deletar_Usr();
 
                                                     NodeList nodeusr = doc.getElementsByTagName("tSEP_AGE");
                                                     for (int tempusr = 0; tempusr < nodeusr.getLength(); tempusr++) {
                                                         Node nusr = nodeusr.item(tempusr);
                                                         Element usrElement = (Element) nusr;
-                                                        String snome = usrElement.getElementsByTagName("sNome").item(0).getTextContent();
-                                                        String ssenha = usrElement.getElementsByTagName("sSenha").item(0).getTextContent();
-                                                        String sfectur = usrElement.getElementsByTagName("sFectur").item(0).getTextContent();
-                                                        String stipage = usrElement.getElementsByTagName("sTipusr").item(0).getTextContent();
+                                                        String snome = usrElement.getElementsByTagName("sNome").item(0).getTextContent().trim();
+                                                        String ssenha = usrElement.getElementsByTagName("sSenha").item(0).getTextContent().trim();
+                                                        String sfectur = usrElement.getElementsByTagName("sFectur").item(0).getTextContent().trim();
+                                                        String stipage = "";
+                                                        NodeList nodeTipusr = usrElement.getElementsByTagName("sTipusr");
+                                                        if (nodeTipusr.getLength() > 0 && nodeTipusr.item(0) != null) {
+                                                            stipage = nodeTipusr.item(0).getTextContent().trim();
+                                                        }
                                                         String stippvd = "";
                                                         if (stipage.equals("O")) {
                                                             stippvd = "S";
                                                         } //Tipo Operador indica que abre outra tela de PVD
-                                                        dbuser.InserirUsr(snome, ssenha, sfectur, "", stippvd);
-                                                        String snovousuario = Novo_Usuario;
-                                                        if (snome.equals(snovousuario)) {
-                                                            Nome_user = Novo_Usuario;
-                                                            Intent it = getIntent();
-
-                                                            it.putExtra("user", Nome_user);
-                                                            it.putExtra("Activity_Dados", "0");
-
-                                                            setResult(RESULT_OK, it);
-                                                            finish();
+                                                        if (!dbuser.UsuarioExiste(snome)) {
+                                                            dbuser.InserirUsr(snome, ssenha, sfectur, "", stippvd, "");
+                                                            usuariosIncluidos++;
+                                                            spassou = "S";
                                                         }
                                                     }
 
@@ -552,57 +592,32 @@ public class LoginActivity extends AppCompatActivity {
 
 
                                     if (spassou.equals("")) {
-                                        Intent it = getIntent();
-
-                                        it.putExtra("user", "");
-                                        it.putExtra("Activity_Dados", "0");
                                         alert.cancel();
-                                        //setResult(RESULT_OK, it);
-                                        //finish();
+                                        avisarUsuariosIncluidos(usuariosIncluidos);
+                                        finalizarLogin(Nome_user);
 
+                                    } else {
+                                        avisarUsuariosIncluidos(usuariosIncluidos);
+                                        finalizarLogin(Nome_user);
                                     }
                                 } catch (Exception e) {
-                                    Intent it = getIntent();
-
-                                    it.putExtra("user", "");
-                                    it.putExtra("Activity_Dados", "0");
                                     alert.cancel();
-
-                                    //setResult(RESULT_OK, it);
-                                    //finish();
+                                    finalizarLogin(Nome_user);
 
                                 }
                             } else {
-                                Intent it = getIntent();
-
-                                it.putExtra("user", "");
-                                it.putExtra("Activity_Dados", "0");
                                 alert.cancel();
-
-                                //setResult(RESULT_OK, it);
-                                //finish();
+                                finalizarLogin(Nome_user);
                             }
 
                            } catch (Exception e) {
-                            Intent it = getIntent();
-
-                            it.putExtra("user", "");
-                            it.putExtra("Activity_Dados", "0");
                             alert.cancel();
-
-                            //setResult(RESULT_OK, it);
-                            //finish();
+                            finalizarLogin(Nome_user);
 
                         }
                     } else {
-                        Intent it = getIntent();
-
-                        it.putExtra("user", "");
-                        it.putExtra("Activity_Dados", "0");
                         alert.cancel();
-
-                        //setResult(RESULT_OK, it);
-                        //finish();
+                        finalizarLogin(Nome_user);
                     }
                 }
                 ///////////

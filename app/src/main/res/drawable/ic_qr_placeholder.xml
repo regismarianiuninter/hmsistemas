@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Fundo branco -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,0h200v200h-200z"/>
+
+    <!-- Quadrado superior esquerdo -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,20h50v50h-50z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,30h30v30h-30z"/>
+
+    <!-- Quadrado superior direito -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M130,20h50v50h-50z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M140,30h30v30h-30z"/>
+
+    <!-- Quadrado inferior esquerdo -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,130h50v50h-50z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,140h30v30h-30z"/>
+
+    <!-- Alguns módulos simulando QR aleatórios -->
+    <path android:fillColor="#000000" android:pathData="M90,90h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M110,90h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M90,110h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M110,110h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M150,150h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M170,170h10v10h-10z"/>
+    <path android:fillColor="#000000" android:pathData="M150,170h10v10h-10z"/>
+</vector>

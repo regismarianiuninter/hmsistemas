@@ -634,8 +634,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (cursor.getCount() == 0){
-            dbu.InserirUsr("HMINFO", "1hm26990", "S", "", "");
-            dbu.InserirUsr("CIELO", "123456", "S", "", "");
+            dbu.InserirUsr("HMINFO", "1hm26990", "S", "", "", "");
+            dbu.InserirUsr("CIELO", "123456", "S", "", "", "");
 
         }
     }

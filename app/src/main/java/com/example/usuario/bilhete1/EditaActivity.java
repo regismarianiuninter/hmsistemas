@@ -354,6 +354,7 @@ public class EditaActivity extends AppCompatActivity {
         EditText edt04 = findViewById(R.id.edt04);
         EditText edt05 = findViewById(R.id.edt05);
         EditText edt06 = findViewById(R.id.edt06);
+        EditText edt07 = findViewById(R.id.edt07);
 
         edt01.setText(sCodUsr);
         ID_Old = sCodUsr;
@@ -362,6 +363,7 @@ public class EditaActivity extends AppCompatActivity {
         edt04.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Fectur"));
         edt05.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Ultatu"));
         edt06.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Tippvd"));
+        edt07.setText(dbu.Busca_Dados_Usr_ID(iUsr, "Atuusr"));
 
     }
 
@@ -459,7 +461,8 @@ public class EditaActivity extends AppCompatActivity {
         EditText edt04 = findViewById(R.id.edt04);
         EditText edt05 = findViewById(R.id.edt05);
         EditText edt06 = findViewById(R.id.edt06);
-        String sID, snome, ssenha, sfectur, sultatu, tippvd;
+        EditText edt07 = findViewById(R.id.edt07);
+        String sID, snome, ssenha, sfectur, sultatu, tippvd, atuusr;
         sID = edt01.getText().toString();
         snome = edt02.getText().toString();
         ssenha = edt03.getText().toString();
@@ -467,10 +470,11 @@ public class EditaActivity extends AppCompatActivity {
         sfectur = edt04.getText().toString();
         sultatu = edt05.getText().toString();
         tippvd = edt06.getText().toString();
+        atuusr = edt07.getText().toString();
 
 
         DB_USR dbu = new DB_USR(this);
-        dbu.Atualizar_Usr(sID,snome,ssenha,sfectur,sultatu, tippvd);
+        dbu.Atualizar_Usr(sID,snome,ssenha,sfectur,sultatu, tippvd, atuusr);
     }
 
 
@@ -504,16 +508,18 @@ public class EditaActivity extends AppCompatActivity {
         EditText edt03 = findViewById(R.id.edt03);
         EditText edt04 = findViewById(R.id.edt04);
         EditText edt06 = findViewById(R.id.edt05);
+        EditText edt07 = findViewById(R.id.edt07);
 
-        String snome, ssenha, sfectur, tippvd;
+        String snome, ssenha, sfectur, tippvd, atuusr;
         snome = edt02.getText().toString();
         ssenha = edt03.getText().toString();
         snome = snome.toUpperCase();
         sfectur = edt04.getText().toString();
         tippvd = edt06.getText().toString();
+        atuusr = edt07.getText().toString();
 
         DB_USR dbu = new DB_USR(this);
-        dbu.InserirUsr(snome,ssenha,sfectur, "", tippvd);
+        dbu.InserirUsr(snome,ssenha,sfectur, "", tippvd, atuusr);
 
         edt02.setText("");
         edt03.setText("");

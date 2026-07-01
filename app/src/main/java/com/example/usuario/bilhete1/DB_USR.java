@@ -17,7 +17,7 @@ public class DB_USR extends SQLiteOpenHelper {
     /** O nome do arquivo de base de dados no sistema de arquivos */
     private static final String NOME_BD = "USR";
     /** A versão da base de dados que esta classe compreende. */
-    private static final int VERSAO_BD = 4;
+    private static final int VERSAO_BD = 5;
     private static final String LOG_TAG = "USR";
     /** Mantém rastreamento do contexto que nós podemos carregar SQL */
     private final Context contexto;
@@ -54,7 +54,13 @@ public class DB_USR extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         // If you need to add a column
         if (newVersion > oldVersion) {
-            db.execSQL("ALTER TABLE USR ADD COLUMN Tippvd TEXT DEFAULT ''");
+            if (oldVersion < 4) {
+                db.execSQL("ALTER TABLE USR ADD COLUMN Tippvd TEXT DEFAULT ''");
+            }
+            if (oldVersion < 5) {
+                db.execSQL("ALTER TABLE USR ADD COLUMN Atuusr TEXT DEFAULT ''");
+            }
+
         }
     }
 
@@ -84,7 +90,7 @@ public class DB_USR extends SQLiteOpenHelper {
         return cc;
     }
 
-    public long InserirUsr(String usrnom, String usrsen, String fectur, String ultatu, String tippvd)
+    public long InserirUsr(String usrnom, String usrsen, String fectur, String ultatu, String tippvd, String atuusr)
 
 
 
@@ -99,7 +105,7 @@ public class DB_USR extends SQLiteOpenHelper {
             initialValues.put("Fectur", fectur);
             initialValues.put("Ultatu", ultatu);
             initialValues.put("Tippvd", tippvd);
-
+            initialValues.put("Atuusr", atuusr);
 
             return db.insert("USR", null, initialValues);
         }
@@ -115,7 +121,7 @@ public class DB_USR extends SQLiteOpenHelper {
         db.close();
     }
 
-    public void Atualizar_Usr(String id, String usrnom, String usrsen, String fectur, String ultatu, String tippvd) {
+    public void Atualizar_Usr(String id, String usrnom, String usrsen, String fectur, String ultatu, String tippvd, String atuusr) {
         SQLiteDatabase db = this.getReadableDatabase();
 
         ContentValues valores = new ContentValues();
@@ -126,6 +132,7 @@ public class DB_USR extends SQLiteOpenHelper {
         valores.put("Fectur", fectur);
         valores.put("Ultatu", ultatu);
         valores.put("Tippvd", tippvd);
+        valores.put("Atuusr", atuusr);
 
 
 
@@ -142,6 +149,16 @@ public class DB_USR extends SQLiteOpenHelper {
 
         getWritableDatabase().update("USR", valores, "id=?", argumentos);
 
+    }
+
+    public boolean UsuarioExiste(String usrnom) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT ID FROM USR WHERE UPPER(TRIM(Usrnom)) = UPPER(TRIM(?)) LIMIT 1", new String[]{usrnom});
+        try {
+            return cursor.moveToFirst();
+        } finally {
+            cursor.close();
+        }
     }
 
     public static class UsrCursor extends SQLiteCursor
@@ -181,7 +198,7 @@ public class DB_USR extends SQLiteOpenHelper {
         public String getFectur() { return getString(getColumnIndexOrThrow("Fectur")); }
         public String getUltatu() { return getString(getColumnIndexOrThrow("Ultatu")); }
         public String getTippvd() { return getString(getColumnIndexOrThrow("Tippvd")); }
-
+        public String getAtuusr() { return getString(getColumnIndexOrThrow("Atuusr")); }
 
 
 

@@ -381,7 +381,7 @@ public class TreActivity extends AppCompatActivity {
                 if (sGrava.equals("S")){
 
                     DB_USR dbNew = new DB_USR(this);
-                    dbNew.InserirUsr(Nome, Senha, Fectur, "", "");
+                    dbNew.InserirUsr(Nome, Senha, Fectur, "", "", "");
 
                 }
             }
