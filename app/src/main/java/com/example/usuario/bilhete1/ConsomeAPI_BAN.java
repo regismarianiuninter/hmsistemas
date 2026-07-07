@@ -15,6 +15,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -35,8 +36,8 @@ public class ConsomeAPI_BAN {
 
     public ConsomeAPI_BAN(String baseUrl, String pfxFilePath, String pfxPassword) {
         this.baseUrl = baseUrl;
-        this.pfxFilePath = pfxFilePath;
-        this.pfxPassword = pfxPassword;
+        this.pfxFilePath = pfxFilePath == null ? "" : pfxFilePath.trim();
+        this.pfxPassword = pfxPassword == null ? "" : pfxPassword.trim();
     }
 
     // Cria o JSON para a cobrança Pix
@@ -60,8 +61,16 @@ public class ConsomeAPI_BAN {
     public SSLSocketFactory generateSSLSocketFactory() {
         try{
         // Configurar o KeyStore com o certificado PFX
+        File pfxFile = new File(pfxFilePath);
+        if (!pfxFile.exists() || !pfxFile.isFile()) {
+            throw new RuntimeException("Certificado PIX nao encontrado: " + pfxFilePath);
+        }
+        if (pfxFile.length() == 0) {
+            throw new RuntimeException("Certificado PIX vazio: " + pfxFilePath);
+        }
+
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        try (FileInputStream fis = new FileInputStream(pfxFilePath)) {
+        try (FileInputStream fis = new FileInputStream(pfxFile)) {
             keyStore.load(fis, pfxPassword.toCharArray());
         }
 
@@ -76,7 +85,13 @@ public class ConsomeAPI_BAN {
         return  sslContext.getSocketFactory();
 
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            Throwable root = e;
+            while (root.getCause() != null) root = root.getCause();
+            throw new RuntimeException(
+                    "Falha ao carregar certificado PIX. Arquivo: " + pfxFilePath
+                            + ". Verifique se este e o PFX correto e se a senha cadastrada confere. Detalhe: "
+                            + root.getClass().getSimpleName() + ": " + root.getMessage(),
+                    e);
         }
     }
 

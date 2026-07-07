@@ -337,6 +337,72 @@ public class ViaActivity extends AppCompatActivity {
     int progress = 0;
     ProgressBar simpleProgressBar;
 
+    private interface PixPaymentClient {
+        PixCharge gerarCobranca(String accessToken, String chave, String nomeEmpresa, String cnpjEmpresa,
+                                String valor, String txid, String numeroPassagem) throws Exception;
+
+        String consultarPix(String accessToken, String txid, Date qrCodeDate) throws Exception;
+    }
+
+    private static class PixCharge {
+        final String txid;
+        final String qrCodeText;
+
+        PixCharge(String txid, String qrCodeText) {
+            this.txid = txid;
+            this.qrCodeText = qrCodeText;
+        }
+    }
+
+    private static class BanestesPixPaymentClient implements PixPaymentClient {
+        private final ConsomeAPI_BAN client;
+
+        BanestesPixPaymentClient(ConsomeAPI_BAN client) {
+            this.client = client;
+        }
+
+        @Override
+        public PixCharge gerarCobranca(String accessToken, String chave, String nomeEmpresa, String cnpjEmpresa,
+                                       String valor, String txid, String numeroPassagem) throws Exception {
+            String qrCodeText = client.getQrcodePix(accessToken, chave, nomeEmpresa, valor, txid, numeroPassagem);
+            return new PixCharge(txid, qrCodeText);
+        }
+
+        @Override
+        public String consultarPix(String accessToken, String txid, Date qrCodeDate) throws Exception {
+            return client.consultarPix(accessToken, txid, qrCodeDate);
+        }
+    }
+
+    private static class SicoobPixPaymentClient implements PixPaymentClient {
+        private final ConsomeAPI_Sicoob client;
+
+        SicoobPixPaymentClient(ConsomeAPI_Sicoob client) {
+            this.client = client;
+        }
+
+        @Override
+        public PixCharge gerarCobranca(String accessToken, String chave, String nomeEmpresa, String cnpjEmpresa,
+                                       String valor, String txid, String numeroPassagem) throws Exception {
+            ConsomeAPI_Sicoob.PixChargeResponse response = client.createPixCharge(
+                    accessToken,
+                    chave,
+                    nomeEmpresa,
+                    cnpjEmpresa,
+                    valor,
+                    "Pagamento - Bilhete " + numeroPassagem,
+                    "Referente ao documento: " + numeroPassagem,
+                    3600
+            );
+            return new PixCharge(response.txid, response.pixCopiaECola);
+        }
+
+        @Override
+        public String consultarPix(String accessToken, String txid, Date qrCodeDate) throws Exception {
+            return client.consultarPix(accessToken, txid);
+        }
+    }
+
 
     private ServiceConnection connService = new ServiceConnection() {
 
@@ -2097,6 +2163,9 @@ public class ViaActivity extends AppCompatActivity {
                 String clientId = dbemp.Busca_Dados_Emp(1, "Cliidb");
                 String clientSecret = dbemp.Busca_Dados_Emp(1, "Clisec");
                 String baseUrl = dbemp.Busca_Dados_Emp(1, "Banwse");
+                String chavePix = dbemp.Busca_Dados_Emp(1, "Banchv");
+                String nomeEmpresa = dbemp.Busca_Dados_Emp(1, "Descri");
+                String cnpjEmpresa = dbemp.Busca_Dados_Emp(1, "Cnpj");
                 String svalorvenda = Guarda_valor;
                 svalorvenda = svalorvenda.replace(',', '.');
                 String sserie = dbemp.Busca_Dados_Emp(1, "Serie");
@@ -2107,27 +2176,38 @@ public class ViaActivity extends AppCompatActivity {
                 String sbilhete = Integer.toString(iproximo);
                 String ntxtunic = snumpdv + sserie + sbilhete;
 
-                ConsomeAPI_BAN client = new ConsomeAPI_BAN(baseUrl, scertificado, pfxPassword);
-                String accessToken = client.getAccessToken(clientId, clientSecret);
-                String qrCodeText = client.getQrcodePix(
+                PixPaymentClient pixClient;
+                String accessToken;
+                if (isSicoobPixUrl(baseUrl)) {
+                    ConsomeAPI_Sicoob client = new ConsomeAPI_Sicoob(baseUrl, scertificado, pfxPassword);
+                    pixClient = new SicoobPixPaymentClient(client);
+                    accessToken = client.getAccessToken(clientId, clientSecret);
+                } else {
+                    ConsomeAPI_BAN client = new ConsomeAPI_BAN(baseUrl, scertificado, pfxPassword);
+                    pixClient = new BanestesPixPaymentClient(client);
+                    accessToken = client.getAccessToken(clientId, clientSecret);
+                }
+
+                PixCharge pixCharge = pixClient.gerarCobranca(
                         accessToken,
-                        dbemp.Busca_Dados_Emp(1, "Banchv"),
-                        dbemp.Busca_Dados_Emp(1, "Descri"),
+                        chavePix,
+                        nomeEmpresa,
+                        cnpjEmpresa,
                         svalorvenda,
                         ntxtunic,
                         sbilhete
                 );
 
-                if (!qrCodeText.isEmpty()) {
+                if (pixCharge.qrCodeText != null && !pixCharge.qrCodeText.isEmpty()) {
                     runOnUiThread(() -> {
                         ImageView imgqrcode = view.findViewById(R.id.imgQRC);
-                        Bitmap qrcodeBMP = QRCodeGenerator.displayQRCode(qrCodeText, imgqrcode, 150, 150);
+                        Bitmap qrcodeBMP = QRCodeGenerator.displayQRCode(pixCharge.qrCodeText, imgqrcode, 150, 150);
                         imgqrcode.setImageBitmap(qrcodeBMP);
                     });
                 }
 
                 Date qrCodeDate = new Date();
-                startPolling(client, accessToken, ntxtunic, qrCodeDate, txtPaymentStatus, btnRecheckPayment, alert, iqtd);
+                startPolling(pixClient, accessToken, pixCharge.txid, qrCodeDate, txtPaymentStatus, btnRecheckPayment, alert, iqtd);
 
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -2142,6 +2222,10 @@ public class ViaActivity extends AppCompatActivity {
                 server.shutdown();
             }
         });
+    }
+
+    private boolean isSicoobPixUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("sicoob");
     }
 
 
@@ -2245,7 +2329,7 @@ public class ViaActivity extends AppCompatActivity {
 
     }
 
-    private void startPolling(ConsomeAPI_BAN client, String accessToken, String txid, Date qrCodeDate, TextView txtPaymentStatus, Button btnRecheckPayment, AlertDialog alert, int iqtd) {
+    private void startPolling(PixPaymentClient client, String accessToken, String txid, Date qrCodeDate, TextView txtPaymentStatus, Button btnRecheckPayment, AlertDialog alert, int iqtd) {
         ThreadPoolManager.getInstance().executeTask(() -> {
             for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                 try {

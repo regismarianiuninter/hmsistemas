@@ -203,13 +203,20 @@ public class ActivateBathroom extends AppCompatActivity {
         PFX_PASSWORD = dbemp.Busca_Dados_Emp(1,"Bansen");
         CLIENT_ID = dbemp.Busca_Dados_Emp(1,"Cliidb");
         SICREDI_BASE_URL = dbemp.Busca_Dados_Emp(1,"Banwse");
-       // SICOOB_BASE_URL = dbemp.Busca_Dados_Emp(1,"Banwse");
+        SICOOB_BASE_URL = dbemp.Busca_Dados_Emp(1,"Banwse");
         CLIENT_SECRET = dbemp.Busca_Dados_Emp(1,"Clisec");
         CHAVE_PIX = dbemp.Busca_Dados_Emp(1,"Banchv");
         NOME_EMPRESA = dbemp.Busca_Dados_Emp(1,"Descri");
         CNPJ_EMPRESA = dbemp.Busca_Dados_Emp(1,"Cnpj");
-        apiSicredi = new ConsomeAPI_Sicredi(SICREDI_BASE_URL, PFX_FILE_PATH, PFX_PASSWORD);
-        //apiSicoob = new ConsomeAPI_Sicoob(SICOOB_BASE_URL, PFX_FILE_PATH, PFX_PASSWORD);
+        if (isSicoobPixUrl(SICOOB_BASE_URL)) {
+            apiSicoob = new ConsomeAPI_Sicoob(SICOOB_BASE_URL, PFX_FILE_PATH, PFX_PASSWORD);
+        } else {
+            apiSicredi = new ConsomeAPI_Sicredi(SICREDI_BASE_URL, PFX_FILE_PATH, PFX_PASSWORD);
+        }
+    }
+
+    private boolean isSicoobPixUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("sicoob");
     }
 
     private void setupServiceDropdown() {
@@ -337,7 +344,10 @@ public class ActivateBathroom extends AppCompatActivity {
         executorService.execute(() -> {
             try {
                 // Obter token
-                currentAccessToken = apiSicredi.getAccessToken(CLIENT_ID, CLIENT_SECRET);
+                boolean isSicoobPix = isSicoobPixUrl(SICOOB_BASE_URL);
+                currentAccessToken = isSicoobPix
+                        ? apiSicoob.getAccessToken(CLIENT_ID, CLIENT_SECRET)
+                        : apiSicredi.getAccessToken(CLIENT_ID, CLIENT_SECRET);
                 //currentAccessToken = apiSicoob.getAccessToken(CLIENT_ID, CLIENT_SECRET);
 
                 // Obter valor do serviço
@@ -347,6 +357,34 @@ public class ActivateBathroom extends AppCompatActivity {
                 //String sval = "0.01";
                 double valorTotal = Double.parseDouble(sval) * ticketQuantity;
                 String valorFormatado = String.format(Locale.US, "%.2f", valorTotal);
+
+                if (isSicoobPix) {
+                    ConsomeAPI_Sicoob.PixChargeResponse response = apiSicoob.createPixCharge(
+                            currentAccessToken,
+                            CHAVE_PIX,
+                            NOME_EMPRESA,
+                            CNPJ_EMPRESA,
+                            valorFormatado,
+                            "Pagamento - " + service + " x" + ticketQuantity,
+                            "Ticket de Acesso",
+                            3600 // 1 hora de expiracao
+                    );
+
+                    currentTxid = response.txid;
+
+                    final Bitmap qrBitmap = QRCodeGenerator.generateQRCode(
+                            response.pixCopiaECola,
+                            512,
+                            512
+                    );
+
+                    runOnUiThread(() -> {
+                        imageQr.setImageBitmap(qrBitmap);
+                        buttonFinalize.setEnabled(true);
+                        startPolling();
+                    });
+                    return;
+                }
 
                 // Criar cobrança Pix
                 ConsomeAPI_Sicredi.PixChargeResponse response = apiSicredi.createPixCharge(
@@ -419,7 +457,10 @@ public class ActivateBathroom extends AppCompatActivity {
 
                 executorService.execute(() -> {
                     try {
-                        String status = apiSicredi.consultarPix(currentAccessToken, currentTxid);
+                        boolean isSicoobPix = isSicoobPixUrl(SICOOB_BASE_URL);
+                        String status = isSicoobPix
+                                ? apiSicoob.consultarPix(currentAccessToken, currentTxid)
+                                : apiSicredi.consultarPix(currentAccessToken, currentTxid);
                        // String status = apiSicoob.consultarPix(currentAccessToken, currentTxid);
                         runOnUiThread(() -> {
                             if ("CONCLUIDA".equals(status)) {
@@ -434,7 +475,10 @@ public class ActivateBathroom extends AppCompatActivity {
                         if (e.getMessage().contains("401")) {
                             // Tenta renovar o token
                             try {
-                                currentAccessToken = apiSicredi.getAccessToken(CLIENT_ID, CLIENT_SECRET);
+                                boolean isSicoobPix = isSicoobPixUrl(SICOOB_BASE_URL);
+                                currentAccessToken = isSicoobPix
+                                        ? apiSicoob.getAccessToken(CLIENT_ID, CLIENT_SECRET)
+                                        : apiSicredi.getAccessToken(CLIENT_ID, CLIENT_SECRET);
                                // currentAccessToken = apiSicoob.getAccessToken(CLIENT_ID, CLIENT_SECRET);
                                 runOnUiThread(() -> Toast.makeText(ActivateBathroom.this,
                                         "Token renovado, continuando verificação...",
